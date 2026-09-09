@@ -22,7 +22,7 @@
         return Sudoku.validateSavedState({ ...state, elapsedTime });
       } catch (error) {
         // Missing permissions, malformed JSON, and corrupt nested history all
-        // take the same safe path: let the app start its normal fixture.
+        // take the same safe path: let the app generate a clean game.
         return null;
       }
     }
@@ -32,7 +32,7 @@
         const savedAt = now();
         if (!Number.isSafeInteger(savedAt) || savedAt < 0) return false;
         // The detected system theme is presentation state; detect it anew.
-        const { systemTheme, ...savedState } = state;
+        const { systemTheme, generating, ...savedState } = state;
         getStorage().setItem(STORAGE_KEY, JSON.stringify({ schemaVersion: SCHEMA_VERSION, savedAt, state: savedState }));
         return true;
       } catch (error) {

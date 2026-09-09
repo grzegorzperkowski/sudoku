@@ -25,6 +25,8 @@
       candidates: emptyCandidates(),
       selectedCell: null,
       difficulty: "Normal",
+      puzzleDifficulty: null,
+      generating: false,
       status: "idle",
       elapsedTime: 0,
       theme: "auto",
@@ -82,23 +84,14 @@
       throw new RangeError("Every given must match its solution digit.");
     }
 
-    // This checks the supplied solution, without solving or checking uniqueness.
-    for (let unit = 0; unit < 9; unit += 1) {
-      const row = new Set();
-      const column = new Set();
-      const box = new Set();
-      const boxRow = Math.floor(unit / 3) * 3;
-      const boxColumn = (unit % 3) * 3;
-      for (let offset = 0; offset < 9; offset += 1) {
-        row.add(solution[unit * 9 + offset]);
-        column.add(solution[offset * 9 + unit]);
-        box.add(solution[(boxRow + Math.floor(offset / 3)) * 9 + boxColumn + offset % 3]);
-      }
-      if (row.size !== 9 || column.size !== 9 || box.size !== 9) {
-        throw new RangeError("The supplied solution must satisfy every Sudoku row, column, and box.");
-      }
+    if (!Sudoku.Board.isValidBoard(solution, true) || Sudoku.countSolutions(givens) !== 1) {
+      throw new RangeError("The puzzle must have exactly one valid solution.");
     }
-    return { givens: givens.slice(), solution: solution.slice(), difficulty };
+    const puzzleDifficulty = puzzleData.puzzleDifficulty === undefined ? null : puzzleData.puzzleDifficulty;
+    if (puzzleDifficulty !== null && (!DIFFICULTIES.includes(puzzleDifficulty) || Sudoku.analyzeDifficulty(givens).difficulty !== puzzleDifficulty)) {
+      throw new RangeError("The puzzle's logical difficulty does not match its rating.");
+    }
+    return { givens: givens.slice(), solution: solution.slice(), difficulty, puzzleDifficulty };
   }
 
   function startPuzzle(state, puzzleData) {
@@ -111,6 +104,8 @@
       candidates: emptyCandidates(),
       selectedCell: null,
       difficulty: puzzle.difficulty,
+      puzzleDifficulty: puzzle.puzzleDifficulty,
+      generating: false,
       status: "active",
       elapsedTime: 0,
       history: [],
@@ -121,20 +116,15 @@
   }
 
   function isPeer(first, second) {
-    if (first === second) return false;
-    const row = Math.floor(first / 9), column = first % 9;
-    const otherRow = Math.floor(second / 9), otherColumn = second % 9;
-    return row === otherRow || column === otherColumn ||
-      (Math.floor(row / 3) === Math.floor(otherRow / 3) && Math.floor(column / 3) === Math.floor(otherColumn / 3));
+    return Sudoku.Board.isPeer(first, second);
   }
 
   function canEdit(state) {
     return state.status === "active" && state.selectedCell !== null && state.givens[state.selectedCell] === 0;
   }
 
-  function updateCellValue(state, value, elapsedTime) {
-    const index = state.selectedCell;
-    if (!canEdit(state) || (state.values[index] === value && state.candidates[index].length === 0)) {
+  function updateCellValue(state, value, elapsedTime, index = state.selectedCell) {
+    if (!canEdit({ ...state, selectedCell: index }) || (state.values[index] === value && state.candidates[index].length === 0)) {
       return state;
     }
     const values = state.values.slice();
@@ -190,7 +180,10 @@
   }
 
   function reduceGameState(state, action) {
+    if (state.generating && !["START_GAME", "SET_GENERATING", "SET_THEME", "SET_SYSTEM_THEME", "TICK"].includes(action.type)) return state;
     switch (action.type) {
+      case "SET_GENERATING":
+        return typeof action.generating !== "boolean" || action.generating === state.generating ? state : { ...state, generating: action.generating };
       case "START_GAME":
         return startPuzzle(state, action.puzzleData);
       case "RESTART_GAME":
@@ -218,6 +211,19 @@
         return toggleCandidate(state, action.value);
       case "AUTO_CANDIDATES":
         return autoCandidates(state);
+      case "HINT": {
+        if (state.status !== "active") return state;
+        // Player notes are not solver candidates. Ignore incorrect entries when
+        // looking for a placement; a Hint may correct exactly one wrong cell.
+        const clean = state.values.map((value, cell) => value === state.solution[cell] ? value : 0);
+        const report = Sudoku.solveLogical(clean, { stopAfterPlacement: true });
+        const placement = report.steps.flatMap(step => step.placements)[0];
+        const cell = placement ? placement.cell : clean.findIndex(value => !value);
+        return cell < 0 ? state : updateCellValue(state, state.solution[cell], action.elapsedTime, cell);
+      }
+      case "SOLVE":
+        return state.status !== "active" || action.confirmed !== true ? state :
+          { ...state, values: state.solution.slice(), candidates: emptyCandidates(), status: "completed" };
       case "TOGGLE_NOTES_MODE":
         return { ...state, notesMode: !state.notesMode };
       case "UNDO":
@@ -299,7 +305,7 @@
       let nextState = reduceGameState(previousState, action);
       if (nextState === previousState) return state;
 
-      const edit = ["SET_CELL_VALUE", "CLEAR_CELL", "INPUT_DIGIT", "TOGGLE_CANDIDATE", "AUTO_CANDIDATES"].includes(action.type);
+      const edit = ["SET_CELL_VALUE", "CLEAR_CELL", "INPUT_DIGIT", "TOGGLE_CANDIDATE", "AUTO_CANDIDATES", "HINT", "SOLVE"].includes(action.type);
       if (edit) {
         nextState = { ...nextState, history: [...state.history, gameplaySnapshot(state)], future: [] };
       }
@@ -330,6 +336,7 @@
       },
       actions: Object.freeze({
         startGame: puzzleData => dispatch({ type: "START_GAME", puzzleData }),
+        setGenerating: generating => dispatch({ type: "SET_GENERATING", generating }),
         restartGame: () => dispatch({ type: "RESTART_GAME" }),
         selectCell: index => dispatch({ type: "SELECT_CELL", index }),
         moveSelection: (deltaRow, deltaColumn) => dispatch({ type: "MOVE_SELECTION", deltaRow, deltaColumn }),
@@ -338,6 +345,8 @@
         toggleCandidate: value => dispatch({ type: "TOGGLE_CANDIDATE", value }),
         toggleNotesMode: () => dispatch({ type: "TOGGLE_NOTES_MODE" }),
         autoCandidates: () => dispatch({ type: "AUTO_CANDIDATES" }),
+        hint: () => dispatch({ type: "HINT" }),
+        solve: (confirmed = false) => dispatch({ type: "SOLVE", confirmed }),
         undo: () => dispatch({ type: "UNDO" }),
         redo: () => dispatch({ type: "REDO" }),
         clearCell: () => dispatch({ type: "CLEAR_CELL" }),

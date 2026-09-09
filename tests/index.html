@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sudoku · Phase 1 + 2 checks</title>
+  <title>Sudoku · Phase 1–3 checks</title>
   <style>
     :root { color-scheme: light dark; font: 16px/1.5 system-ui, sans-serif; }
     body { max-width: 900px; margin: 48px auto; padding: 0 24px; }
@@ -14,15 +14,22 @@
     .failed { color: light-dark(#a21b31, #ff9bac); }
     pre { white-space: pre-wrap; font-size: 13px; }
   </style>
+  <script defer src="../js/board.js"></script>
+  <script defer src="../js/exact.js"></script>
+  <script defer src="../js/logical.js"></script>
+  <script defer src="../js/difficulty.js"></script>
+  <script defer src="../js/generator.js"></script>
   <script defer src="../js/game.js"></script>
   <script defer src="../js/puzzles.js"></script>
   <script defer src="../js/persistence.js"></script>
   <script defer src="tests.js"></script>
   <script defer src="phase2.js"></script>
+  <script defer src="phase3.js"></script>
+  <script defer src="generation.js"></script>
 </head>
 <body>
-  <h1>Sudoku · Phase 1 + 2 checks</h1>
-  <p>Offline checks of puzzle data, central actions, serialization, and timer behavior.</p>
+  <h1>Sudoku · Phase 1–3 checks</h1>
+  <p>Offline regression, logical technique, and generator checks. Five generated puzzles per level include Extreme; the full run can take several minutes.</p>
   <p id="summary" role="status">Running…</p>
   <ol id="results"></ol>
   <p><a href="../index.html">Open the application</a></p>

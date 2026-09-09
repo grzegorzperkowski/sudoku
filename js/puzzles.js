@@ -3,9 +3,9 @@
 
   const Sudoku = global.Sudoku = global.Sudoku || {};
 
-  // Temporary Phase 1 development fixture. Phase 3 will replace this provider
-  // with generated puzzle data using the same { givens, solution, difficulty } API.
-  // Difficulty is a requested setting; this fixture has not been classified.
+  // Legacy fixture retained solely for Phase 1/2 regression tests and save
+  // compatibility checks. This script is not loaded by the application.
+  // Difficulty is a requested setting; this fixture is not a rated puzzle.
   const GIVEN_ROWS = [
     "530070000",
     "600195000",

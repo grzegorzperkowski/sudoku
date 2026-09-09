@@ -13,7 +13,9 @@
       filled: find("#filled-count"), progress: find("#progress"), progressFill: find("#progress-fill"),
       completion: find("#completion"), completionMessage: find("#completion-message"),
       undo: find("#undo"), redo: find("#redo"), notes: find("#notes"), autoCandidates: find("#auto-candidates"),
-      inputHeading: find("#input-heading"), keypad: find("#keypad"), persistence: find("#persistence-status")
+      inputHeading: find("#input-heading"), keypad: find("#keypad"), persistence: find("#persistence-status"),
+      hint: find("#hint"), solve: find("#solve"), newGame: find("#new-game"), restart: find("#restart"),
+      puzzleLabel: find("#puzzle-label"), generation: find("#generation-status"), generationError: find("#generation-error")
     };
 
     for (let row = 0; row < 9; row += 1) {
@@ -77,16 +79,21 @@
     }
 
     function render(state) {
+      const busy = state.generating;
       root.documentElement.dataset.theme = state.theme === "auto" ? state.systemTheme : state.theme;
       refs.theme.value = state.theme;
       refs.difficulty.value = state.difficulty;
       refs.timer.textContent = Sudoku.formatElapsedTime(state.elapsedTime);
       refs.timer.dateTime = `PT${Math.floor(state.elapsedTime / 1000)}S`;
-      refs.status.textContent = state.status === "completed" ? "Completed" : "In progress";
+      refs.status.textContent = busy ? "Generating puzzle..." : state.status === "completed" ? "Completed" : state.status === "idle" ? "Ready" : "In progress";
+      refs.puzzleLabel.textContent = state.puzzleDifficulty ? `${state.puzzleDifficulty} puzzle` : "Sudoku";
+      refs.generation.hidden = !busy;
+      board.setAttribute("aria-busy", String(busy));
       cells.forEach((cell, index) => renderCell(state, index));
+      cells.forEach(cell => { cell.button.disabled = busy; });
 
       const selected = state.selectedCell;
-      const editable = selected !== null && state.givens[selected] === 0 && state.status === "active";
+      const editable = !busy && selected !== null && state.givens[selected] === 0 && state.status === "active";
       refs.selection.textContent = selected === null ? "Select a cell" : `R${Math.floor(selected / 9) + 1} · C${selected % 9 + 1}`;
       const help = state.status === "completed" ? "Puzzle complete. Ready for another?" :
         selected === null ? "Choose any empty cell to begin." : state.givens[selected] ? "This is a given and cannot be changed." :
@@ -99,11 +106,16 @@
         button.setAttribute("aria-label", `${state.notesMode ? "Toggle candidate" : "Enter"} ${button.dataset.digit}`);
       });
       refs.erase.disabled = !editable || (state.values[selected] === 0 && state.candidates[selected].length === 0);
-      refs.undo.disabled = state.history.length === 0;
-      refs.redo.disabled = state.future.length === 0;
-      refs.notes.disabled = state.status !== "active";
+      refs.undo.disabled = busy || state.history.length === 0;
+      refs.redo.disabled = busy || state.future.length === 0;
+      refs.notes.disabled = busy || state.status !== "active";
       refs.notes.setAttribute("aria-pressed", String(state.notesMode));
-      refs.autoCandidates.disabled = state.status !== "active";
+      refs.autoCandidates.disabled = busy || state.status !== "active";
+      refs.hint.disabled = busy || state.status !== "active";
+      refs.solve.disabled = busy || state.status !== "active";
+      refs.newGame.disabled = busy;
+      refs.restart.disabled = busy || state.status === "idle";
+      refs.difficulty.disabled = busy;
       refs.inputHeading.textContent = state.notesMode ? "Pencil in notes" : "Place a number";
       refs.keypad.setAttribute("aria-label", state.notesMode ? "Toggle a candidate" : "Enter a number");
 
@@ -129,7 +141,8 @@
       refs.persistence.hidden = saved;
     }
 
-    return { render, focusCell, renderPersistence };
+    function renderGenerationError(failed) { refs.generationError.hidden = !failed; }
+    return { render, focusCell, renderPersistence, renderGenerationError };
   }
 
   Sudoku.createGameView = createGameView;

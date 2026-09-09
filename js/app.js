@@ -41,9 +41,20 @@
     view.focusCell(store.getState().selectedCell);
   }
 
-  function startNewGame() {
-    // Phase 3 replaces this provider; the store and view only consume puzzle data.
-    actions.startGame(Sudoku.getDevelopmentPuzzle(store.getState().difficulty));
+  async function startNewGame() {
+    const state = store.getState();
+    if (state.generating) return;
+    const hasProgress = state.values.some((value, cell) => value !== state.givens[cell]) || state.candidates.some(digits => digits.length) || state.history.length || state.future.length;
+    if (state.status === "active" && hasProgress && !window.confirm("Abandon this unfinished puzzle and start a new game?")) return;
+    actions.setGenerating(true);
+    view.renderGenerationError(false);
+    try {
+      const puzzle = await Sudoku.generatePuzzle(state.difficulty);
+      actions.startGame(puzzle);
+    } catch (error) {
+      actions.setGenerating(false);
+      view.renderGenerationError(true);
+    }
   }
 
   board.addEventListener("click", (event) => {
@@ -59,6 +70,7 @@
   });
 
   document.addEventListener("keydown", (event) => {
+    if (store.getState().generating) return;
     if (event.altKey || event.isComposing || event.defaultPrevented) return;
     // Let native form controls and focused toolbar buttons retain their keys.
     if (event.target.closest("input, select, textarea, [contenteditable]:not([contenteditable='false'])")) return;
@@ -101,13 +113,16 @@
     focusSelection();
   });
   document.querySelector("#restart").addEventListener("click", actions.restartGame);
-  [["#undo", actions.undo], ["#redo", actions.redo], ["#notes", actions.toggleNotesMode], ["#auto-candidates", actions.autoCandidates]].forEach(([selector, action]) => {
+  [["#undo", actions.undo], ["#redo", actions.redo], ["#notes", actions.toggleNotesMode], ["#auto-candidates", actions.autoCandidates], ["#hint", actions.hint]].forEach(([selector, action]) => {
     document.querySelector(selector).addEventListener("click", () => {
       action();
       focusSelection();
     });
   });
   document.querySelector("#new-game").addEventListener("click", startNewGame);
+  document.querySelector("#solve").addEventListener("click", () => {
+    if (store.getState().status === "active" && !store.getState().generating && window.confirm("Reveal the complete solution?")) actions.solve(true);
+  });
   document.querySelector("#difficulty").addEventListener("change", (event) => actions.setDifficulty(event.target.value));
   document.querySelector("#theme").addEventListener("change", (event) => actions.setTheme(event.target.value));
   systemTheme.addEventListener("change", (event) => actions.setSystemTheme(event.matches ? "dark" : "light"));

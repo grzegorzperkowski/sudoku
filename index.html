@@ -9,8 +9,12 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="styles.css">
   <!-- Classic deferred scripts also work when index.html is opened from file://. -->
+  <script defer src="js/board.js"></script>
+  <script defer src="js/exact.js"></script>
+  <script defer src="js/logical.js"></script>
+  <script defer src="js/difficulty.js"></script>
+  <script defer src="js/generator.js"></script>
   <script defer src="js/game.js"></script>
-  <script defer src="js/puzzles.js"></script>
   <script defer src="js/persistence.js"></script>
   <script defer src="js/view.js"></script>
   <script defer src="js/app.js"></script>
@@ -41,7 +45,7 @@
       <div class="workspace">
         <section class="board-section" aria-label="Sudoku game">
           <div class="board-heading">
-            <div><span class="puzzle-label">Development puzzle</span><span id="game-status" class="game-status">In progress</span></div>
+            <div><span id="puzzle-label" class="puzzle-label">Sudoku</span><span id="game-status" class="game-status">Generating puzzle...</span></div>
             <div class="timer-block"><span class="timer-label">TIME</span><time id="timer" role="timer" aria-label="Elapsed time">00:00:00</time></div>
           </div>
           <div id="board" class="board" role="grid" aria-label="Sudoku puzzle" aria-rowcount="9" aria-colcount="9" aria-describedby="keyboard-help"></div>
@@ -63,7 +67,7 @@
             <select id="difficulty" aria-describedby="difficulty-help">
               <option>Easy</option><option selected>Normal</option><option>Hard</option><option>Expert</option><option>Extreme</option>
             </select>
-            <p id="difficulty-help" class="helper-text">All levels use the same ungraded test puzzle. Generation arrives in Phase 3.</p>
+            <p id="difficulty-help" class="helper-text">Choose a level for your next puzzle. Extreme takes longer to generate.</p>
           </div>
           <div class="panel-divider"></div>
           <div class="input-heading"><h2 id="input-heading">Place a number</h2><span id="selection-label">Select a cell</span></div>
@@ -79,8 +83,8 @@
           <div class="future-controls" aria-label="Assistance controls">
             <button id="notes" type="button" class="button" aria-pressed="false" title="Toggle candidate Notes mode">Notes</button>
             <button id="auto-candidates" type="button" class="button" title="Replace notes with all directly legal candidates">Auto Candidates</button>
-            <button type="button" class="button" disabled title="Hints will be available in Phase 3">Hint</button>
-            <button type="button" class="button" disabled title="Solve will be available in Phase 3">Solve</button>
+            <button id="hint" type="button" class="button" disabled title="Reveal one correct digit">Hint</button>
+            <button id="solve" type="button" class="button" disabled title="Reveal the solution after confirmation">Solve</button>
           </div>
           <div class="panel-divider"></div>
           <div class="game-actions">
@@ -88,10 +92,12 @@
             <button id="restart" type="button" class="button restart-button"><span aria-hidden="true">↻</span> Restart</button>
           </div>
           <p id="persistence-status" class="helper-text" role="status" hidden>Browser storage is unavailable or full. Your progress cannot be saved.</p>
+          <p id="generation-status" class="helper-text" role="status" hidden>Generating puzzle... This can take a while for Extreme.</p>
+          <p id="generation-error" class="helper-text" role="alert" hidden>Unable to generate a puzzle. Please try New Game again.</p>
         </aside>
       </div>
     </main>
-    <footer class="app-footer"><span>Every number has its place.</span><span>PHASE 02 <span aria-hidden="true">/</span> LOCAL PLAY</span></footer>
+    <footer class="app-footer"><span>Every number has its place.</span><span>PHASE 03 <span aria-hidden="true">/</span> LOCAL PLAY</span></footer>
   </div>
   <noscript><p class="noscript">Please enable JavaScript to play this offline Sudoku game.</p></noscript>
 </body>

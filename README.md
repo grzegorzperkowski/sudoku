@@ -1,97 +1,171 @@
-# Sudoku — Phase 2
+# Sudoku — Phase 3
 
-A desktop Sudoku application made with HTML, CSS, and vanilla JavaScript. It runs fully offline with no dependencies, installation, build step, or server.
+A desktop Sudoku application made with HTML, CSS, and vanilla JavaScript. Open `index.html` directly in Chrome or another modern desktop browser. Everything runs offline: no dependencies, installation, build step, server, external resources, or network requests. Classic scripts work from `file://`.
 
-## Run
+## Playing
 
-1. Open the project directory.
-2. Open `index.html` in a modern desktop browser.
+Click a cell, move with the arrow keys, and enter digits using the keyboard or keypad. Delete, Backspace, and Erase clear editable cells. Givens are protected. Incorrect entries are checked against the verified solution; correct completion stops the timer and shows the existing completion message.
 
-Click a cell, use the arrow keys to move, and enter digits with your keyboard or the number pad. Delete, Backspace, and Erase clear editable cells. Given digits are fixed. Incorrect player entries are marked immediately; completing the puzzle stops the timer. Restart resets the current puzzle. New Game loads the development puzzle again.
+Choose **Easy, Normal, Hard, Expert, or Extreme**, then **New Game**. Each new puzzle is generated dynamically, checked for exactly one solution, and solved entirely by the logical engine before it is accepted. Changing the selector chooses the next game's level; the label above the board continues to show the current puzzle's actual rating. New Game asks before abandoning unfinished progress. Restart retains its immediate Phase 2 behavior and resets the current puzzle.
 
-Turn on **Notes** to toggle candidate digits in empty editable cells. Notes appear in fixed positions in a 3×3 mini-grid. Normal number entry clears the cell's own notes and removes that digit from its row, column, and box peers. Deleting a value does not regenerate notes. Erase also clears all notes in an empty cell.
+Generation displays **Generating puzzle...**, disables conflicting game controls and keyboard edits, and periodically yields to the browser. Appearance controls remain usable. Extreme can take considerably longer than the other levels; the generator keeps searching instead of returning an easier puzzle. The old game stays recoverable until a validated replacement is ready. Refresh during generation restores that saved game, or starts fresh generation if there was no previous game. A generation failure leaves the old game intact and offers New Game again.
 
-**Auto Candidates** replaces every empty cell's notes with all digits directly legal against the current board, including player entries. It does not use the stored solution or perform logical solving. Manual notes can contain any digit; only Auto Candidates calculates legality.
+### Notes and history
 
-**Undo / Redo** restore exact values, notes, and completion status. Each move, its automatic peer removals, and each Auto Candidates operation take one history step. A new gameplay edit after Undo clears Redo. Use the buttons, `Ctrl+Z`, `Ctrl+Y`, or `Ctrl+Shift+Z` (Command equivalents also work). Native form controls retain their shortcuts, and unavailable Undo/Redo shortcuts are not intercepted.
+**Notes** toggles manual candidates in empty editable cells, shown in fixed positions in a 3×3 mini-grid. Normal number entry clears the cell's notes and removes that digit from row, column, and box peers. Deleting a value never adds candidates back. Erase also clears all notes in an empty cell.
 
-Progress saves automatically and resumes when you reopen the same application location in the same browser profile. Active time includes time in a background tab or with the application closed. Completed time stays frozen. Undo does not rewind elapsed time; undoing completion resumes the clock, and redoing completion freezes it again. Theme, requested difficulty, Notes mode, and selection survive reload. Restart and New Game retain these settings except selection; both reset values, notes, timer, and both history stacks. The Phase 1 immediate button behavior is retained; there are no confirmation dialogs.
+**Auto Candidates** replaces each empty cell's notes with all directly legal digits against the current board, including incorrect player entries. It does not consult the solution or run logical techniques. Manual notes may contain any digit.
 
-Choose Auto, Light, or Dark for the theme. Auto follows operating-system theme changes. The difficulty selector records Easy, Normal, Hard, Expert, or Extreme, but **all selections currently use the same development puzzle**. Puzzle generation and difficulty classification are not implemented.
+**Undo / Redo** restore exact values, notes, and completion status. Each entry and all its peer removals, each Hint, each confirmed Solve, and each Auto Candidates operation are one atomic history step. New gameplay after Undo clears Redo; no-ops do not. Use the buttons, `Ctrl+Z`, `Ctrl+Y`, or `Ctrl+Shift+Z` (Command equivalents work). Native form controls retain their shortcuts. Settings, selection, and elapsed time stay outside gameplay history, as in Phase 2.
 
-## Files
+**Hint** fills exactly one correct digit without a textual technique explanation. It ignores manual notes and incorrect entries while finding the next logical placement; internal eliminations are not copied to player notes. If that position is logically stuck, Hint reveals one digit from the already verified solution. This assistance fallback is separate from puzzle rating: generated puzzles are never accepted using search to finish the logical solve. A Hint may correct one wrong cell. It keeps selection and Notes mode unchanged and uses the same value-entry/candidate-removal action path as ordinary input. Undo restores every affected note; Redo reproduces the Hint.
 
-```text
-index.html          Application layout and accessible controls
-styles.css          Desktop layout, board, and light/dark theme variables
-js/game.js          Immutable state, central actions, candidate rules, history, validation, timer
-js/puzzles.js       Temporary development puzzle provider
-js/persistence.js   Versioned localStorage serialization and safe restoration
-js/view.js          State-driven board and control rendering
-js/app.js           Input events, theme detection, and timer scheduling
-tests/index.html    Offline regression-check page
-tests/tests.js      Puzzle, action, timer, and state checks
-tests/phase2.js     Candidate, exact history, persistence, and corruption checks
-tests/run.cjs       Optional dependency-free command-line test runner
-tests/browser-check.cjs  Optional local Chrome UI and persistence regression runner
-```
+**Solve** always asks for confirmation before revealing the verified solution. Confirmation creates one central state action, fills the board, clears all candidate notes, marks completion, and stops the timer. Cancellation changes nothing. Solve supports exact Undo/Redo, including resuming/stopping the timer when completion changes.
 
-Classic scripts are used so opening the HTML file directly works without a server or module loader.
+Active time includes background-tab and closed time. Completed time stays frozen. Undo does not rewind the clock. Restart and New Game reset notes, both history stacks, selection, and time; theme, Notes mode, and the requested difficulty remain settings. Auto, Light, and Dark themes retain Phase 2 behavior.
 
 ## Architecture
 
-`Sudoku.createGameStore()` owns the single source of truth. Its plain-data state keeps immutable `givens` and `solution` separate from current `values` and per-cell `candidates`. It also holds `selectedCell`, `difficulty`, `status`, numeric `elapsedTime`, theme preference, `notesMode`, `history`, and `future`. Candidates are sorted arrays of unique digits, so state stays JSON-serializable. Puzzle input is copied; published state and nested data are deeply frozen. The DOM contains no authoritative game data.
+`Sudoku.createGameStore()` remains the single source of truth. Immutable `givens` and `solution` are separate from player `values` and sorted candidate arrays. Published states and snapshots are deeply frozen. Input handlers dispatch central actions; rendering derives the board, highlights, errors, control availability, and completion from state. No solver or action edits DOM cells directly.
 
-Input handlers call central actions. `inputDigit` routes keyboard/keypad input through Notes mode; `setCellValue` remains an explicit normal-value action for future callers. `toggleCandidate`, `autoCandidates`, `clearCell`, `undo`, and `redo` share the same reducer boundary as Phase 1 actions. Each accepted action publishes one state transition. Rendering derives highlights, errors, accessible candidate labels, completion, and button availability from state.
+History still stores complete `{ values, candidates, status }` snapshots with no recursive history. Automatic peer removals are part of the same snapshot transition as an entry or Hint. The timer's injectable clock, anchors, listeners, and scheduler remain outside persisted gameplay. `captureState()` includes precise elapsed milliseconds between scheduled ticks.
 
-History stores complete gameplay snapshots `{ values, candidates, status }`, never snapshots containing history. Candidate arrays can be shared safely because every published snapshot is frozen and edits replace arrays. Undo/Redo restore snapshots directly without recalculating notes. Therefore a manually removed note cannot accidentally return with unrelated peer removals. Settings, selection, and the continuously measured timer are outside gameplay history. No-op actions do not create history or clear Redo. Restart and New Game reset both stacks so another puzzle's moves cannot leak into the current game.
+| File | Responsibility |
+| --- | --- |
+| `index.html`, `styles.css` | Existing offline layout, keyboard help, themes, controls |
+| `js/board.js` | Shared rows, columns, boxes, cell units, peers, validation, candidate masks |
+| `js/exact.js` | Exact solution search, capped solution counting, randomized completed grids |
+| `js/logical.js` | Independent technique finders, candidate state, logical loop, ordered trace and effort metrics |
+| `js/difficulty.js` | Explicit five-level rules and analysis |
+| `js/generator.js` | Random clue carving, uniqueness checks, rating acceptance, cooperative asynchronous driver |
+| `js/game.js` | Existing immutable store, central actions, candidate semantics, history, state validation, clock |
+| `js/persistence.js` | Versioned localStorage serialization and safe restoration |
+| `js/view.js`, `js/app.js` | State-driven rendering, input, confirmations, generation scheduling, theme detection |
+| `js/puzzles.js` | Original fixture retained only for regression tests; not loaded by the application |
 
-Timer scheduling belongs to the application layer. The store measures elapsed milliseconds using an injectable clock; runtime clock anchors and listeners stay outside serializable state. `captureState()` captures precise elapsed milliseconds even between scheduled ticks, without publishing an extra transition.
+### Exact solver and validation
 
-## Persistence
+`Sudoku.solveExact(board, { limit: 2 })` uses minimum-remaining-values backtracking with row/column/box bitmasks. It returns `valid`, `status`, `count`, a first `solution`, `stoppedAtLimit`, and diagnostic `nodes`. Duplicate or malformed input is `invalid`; consistent givens with no completion are `unsolvable`. `countSolutions(board)` stops at two, which is sufficient to reject ambiguity. Counts are capped, not a claim about the total number of solutions beyond the limit. A limit of one finds a solution but cannot certify uniqueness.
 
-`Sudoku.createPersistence()` reads and writes the `sudoku.game` localStorage key with this envelope:
+Randomized candidate traversal creates completed grids. Search is also used for uniqueness and internal validation. Search depth, node counts, and generation attempts do **not** contribute to difficulty.
+
+The store's existing puzzle-input boundary now additionally verifies uniqueness. It still checks 81-cell arrays, digit ranges, Sudoku constraints, and matching givens before replacing the current game. Rated input is independently analyzed again. Rejected puzzle data cannot replace a running game.
+
+### Logical solver
+
+`Sudoku.solveLogical(board)` calculates its own candidates and applies deterministic deductions until solved, invalid, or stuck. It never invokes the exact solver and never reads player notes or the stored solution. After each placement/elimination it starts again at the beginning of the technique order below. Units, cells, digits, and combinations have fixed traversal orders.
+
+Each step records a technique ID/name, affected cells, placements and/or explicit candidate eliminations, weight/rank, and evidence such as source units, subset digits, fish covers, wing cells, or coloring links. The result includes the final board/candidates, status, ordered steps, usage counts, hardest technique/rank, score, intermediate and advanced step counts, and elimination count. `createLogicalPosition`, `findLogicalStep`, and `applyLogicalStep` allow direct technique testing and trace replay. Technique inspection does not mutate a position.
+
+| Technique, in search order | Weight | Group / rank |
+| --- | ---: | --- |
+| Naked Single | 1 | Basic / 1 |
+| Hidden Single | 2 | Basic / 1 |
+| Pointing Pair / Triple | 8 | Intermediate / 2 |
+| Box-Line Reduction / Claiming | 8 | Intermediate / 2 |
+| Naked Pair | 12 | Intermediate / 2 |
+| Hidden Pair | 16 | Intermediate / 2 |
+| Naked Triple | 24 | Intermediate / 3 |
+| Hidden Triple | 28 | Intermediate / 3 |
+| X-Wing | 60 | Advanced / 4 |
+| XY-Wing | 80 | Advanced / 4 |
+| Swordfish | 110 | Advanced / 5 |
+| Simple Coloring | 100 | Advanced / 5 |
+
+Subsets confine N digits to N cells, or N cells to N digits. Pointing and Claiming use box/line intersections. X-Wing and Swordfish support both row and column orientations; Swordfish includes staggered two/three-position bases. XY-Wing uses a bivalue pivot and two wings, eliminating their common third digit from cells seeing both wings. Simple Coloring builds strong-link components for one digit and implements both **wrap** (same-color peers make that color false) and **trap** (an outside candidate sees both colors). These are deterministic deductions, not trials of a guessed digit.
+
+## Difficulty classification
+
+The score is explicit in `logical.js`:
+
+```text
+score = sum of technique weights for all productive steps
+        + 2 × number of explicit candidate eliminations
+```
+
+Placement peer cleanup is routine propagation and does not add elimination points. Empty cells normally produce one placement step each. An intermediate step has rank 2 or 3; an advanced step has rank 4 or 5. Technique weights distinguish reasoning complexity; cumulative work and elimination counts distinguish demanding sequences from isolated deductions.
+
+`difficulty.js` contains the acceptance rules. All conditions in a row must hold, and **every accepted puzzle must solve completely with the logical engine**.
+
+| Level | Score | Required logical profile |
+| --- | --- | --- |
+| Easy | 0–65 | Singles only; no intermediate or advanced technique |
+| Normal | 80–155 | At least one intermediate step, limited to pairs and box/line interactions; no triples or advanced steps |
+| Hard | 180–330 | At least four intermediate steps; triples allowed; no advanced steps |
+| Expert | 350–480 | At least one advanced step and eight explicit eliminations |
+| Extreme | At least 700 | At least four advanced steps, 25 explicit eliminations, and 65 total steps |
+
+Expert and Extreme are additionally rerun with **all advanced techniques disabled**; they must remain unsolved under those restricted techniques. This establishes that advanced reasoning is necessary within the implemented technique set. No particular advanced technique is mandatory for every Extreme.
+
+There are intentional gaps between bands. Puzzles in a gap, outside a profile, or logically stuck are rejected rather than rounded up or relabeled to satisfy a request. Extreme's score floor is over 45% above Expert's absolute ceiling, in addition to its much stronger workload requirements. A high intermediate-only score can never qualify as Extreme.
+
+Clue count does not contribute to the score or classification. The generator uses clue counts only to avoid premature analysis during carving. Hard, Expert, and Extreme frequently have the same number of clues, with substantially different logical paths. Ratings describe this engine's deterministic path; they do not claim that no human could discover a shorter path using a technique outside the implemented set.
+
+### Calibration
+
+An exploratory survey analyzed 1,500 randomly carved minimal puzzles. Many low-clue puzzles needed only singles, while others remained logically stuck. This guided the separate profiles, acceptance gaps, and additional Extreme search.
+
+The final rules were then checked with **10 independently seeded generations per level** (seeds 3100–3109), all unique and completely logically solvable:
+
+| Level | Observed score | Mean score | Intermediate steps | Advanced steps | Explicit eliminations | Clues |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Easy | 36 | 36.0 | 0 | 0 | 0 | 45 |
+| Normal | 80–138 | 98.2 | 1–5 | 0 | 3–12 | 23–35 |
+| Hard | 184–259 | 209.1 | 8–13 | 0 | 17–29 | 22–26 |
+| Expert | 351–398 | 372.2 | 1–8 | 2–3 | 11–25 | 22–26 |
+| Extreme | 713–948 | 782.3 | 5–17 | 5–8 | 25–54 | 22–26 |
+
+Extreme averaged **2.10× Expert's score** and required 67–79 total logical steps. Its paths included XY-Wing, X-Wing, Swordfish, and/or Simple Coloring in addition to intermediate work. The full calibration can be reproduced with `node tests/calibrate.cjs`; it prints ten samples per level as JSON. Exact wall-clock times depend on hardware and browser scheduling. The initial synchronous Extreme sample took roughly 3–44 seconds per puzzle; cooperative browser generation can take longer, including minutes. There is no fixed production time limit or easier fallback.
+
+## Generation algorithm
+
+1. Create a fresh randomized valid completed grid using exact search.
+2. Shuffle clue-removal order. Tentatively remove each clue and restore it unless solution counting proves there is exactly one solution.
+3. For Easy and Normal, analyze productive intermediate carving positions; for higher levels, analyze the carved puzzle.
+4. Run the full deterministic logical solver and acceptance rules. Reject stuck puzzles and incorrect profiles.
+5. For Extreme, explore up to 32 nearby clue layouts around dynamically discovered promising positions. Retain up to four high-effort candidates, add back three to five solution clues, and carve again in a fresh random order. This is a search optimization, not a source of ratings. Unsolved candidates may guide exploration but can never be returned.
+6. If nothing qualifies, start with another independently randomized solved grid. Before returning a puzzle, independently validate its givens, completed solution, uniqueness, logical completion, and requested class again.
+
+No fixed puzzle database supplies gameplay. The legacy puzzle and fixed advanced boards appear only in regression tests. `seededRandom(seed)` provides repeatability for tests; production uses `Math.random`. The synchronous and asynchronous APIs drive the same search iterator. The browser driver targets 12 ms work slices and yields with `setTimeout`; an individual exact/logical operation can exceed that budget. It uses no worker, module-loader, or server assumptions. The optional API `signal` supports cancellation; an optional `maxAttempts` is for bounded callers/tests and throws if exhausted.
+
+## Persistence and compatibility
+
+The `sudoku.game` key retains the Phase 2 envelope:
 
 ```js
 { schemaVersion: 1, savedAt: /* epoch milliseconds */, state: /* serializable game */ }
 ```
 
-The saved state includes the puzzle and stored solution needed by Phase 1 error checking, current values, all candidates, both complete history stacks, difficulty, selection, status, elapsed milliseconds, theme preference, and Notes mode. The detected operating-system theme is omitted and detected anew. No DOM objects or runtime clock anchors are persisted.
+There is **no schema-version bump**. `puzzleDifficulty` is an optional backward-compatible field for the current puzzle's verified rating, separate from `difficulty`, the requested next-game setting. Legacy saves without it restore with a neutral Sudoku label; they are not mislabeled as rated puzzles. The transient `generating` flag and detected system theme are omitted from storage and reset on load. Large logical traces and generation diagnostics are not persisted.
 
-On load, `validateSavedState()` checks the supplied puzzle, every value, candidate digit and candidate list, protected givens, completion status, settings, elapsed time, and every snapshot in both history stacks. Nested history inside snapshots is rejected. Restored arrays are copied and frozen. Missing optional settings get defaults; missing required gameplay/history data, malformed JSON, incompatible schema versions, or invalid content cause the whole saved game to be ignored and the normal development puzzle to start cleanly.
+Validation retains all Phase 2 checks on current values, candidate lists, givens, completion status, settings, elapsed time, and both history stacks. Nested history is still rejected. It additionally verifies the saved puzzle's uniqueness and, when a rating is present, recomputes that rating. Valid Phase 2 saves migrate without losing values, notes, history, settings, or elapsed time. Malformed JSON, incompatible versions, invalid solutions, ambiguous puzzles, incorrect ratings, or corrupt snapshots cause safe fresh generation.
 
-The app saves after accepted central updates. Timer-only writes are limited to once per elapsed second, with precise captures on `visibilitychange` and `pagehide`. Active restoration adds the nonnegative difference between the saved wall-clock timestamp and the current timestamp to the saved elapsed milliseconds, then establishes a fresh runtime clock anchor. Completed games add no closed time. Background tabs keep counting as in Phase 1.
+Accepted central updates save automatically; timer-only writes are limited to once per elapsed second. `visibilitychange` and `pagehide` capture precise elapsed time. Active restoration adds the nonnegative difference from `savedAt`; completed games add no closed time. Restored arrays are copied and frozen.
 
-Storage access or quota errors cannot interrupt play. A visible message reports when progress cannot be saved; no history is silently truncated to fit storage. There is one saved game per application location/browser profile, with no synchronization between simultaneously open tabs (the latest save wins).
-
-Direct-file persistence was verified in Chrome, including closing and reopening the browser. Other browsers can restrict storage for `file:` URLs; the Web Storage API does not standardize that behavior. Private browsing, clearing browser data, or disabling storage can also prevent durable saves. See [MDN's localStorage documentation](https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage). Keep the same file location/profile when reopening.
-
-## Temporary puzzle boundary
-
-`Sudoku.getDevelopmentPuzzle(difficulty)` supplies fresh fixture data. `store.actions.startGame({ givens, solution, difficulty })` accepts flat arrays of 81 cells: zero means an empty given, and the solution contains digits 1–9. The boundary checks array contents, a valid completed Sudoku solution, and matching givens. It does not solve puzzles or verify uniqueness.
-
-Phase 3 can replace the fixture provider with a generator that supplies the same data. Input handling and board rendering do not depend on the puzzle's origin.
-
-## Intentionally deferred to Phase 3
-
-Exact and logical solvers, advanced solving techniques, uniqueness verification, procedural generation, difficulty scoring/classification for all five levels, genuinely difficult Extreme puzzles, Hint, and Solve. Hint and Solve remain visible and disabled. All levels still use the same ungraded development fixture. The existing puzzle-provider boundary is unchanged.
+Storage denial or quota errors leave gameplay usable and show the existing save-failure message. History is never silently truncated. There is one saved game per browser/location, with no synchronization across simultaneously open tabs. Direct-file persistence is verified in Chrome, including full browser closure/relaunch. Other browsers may restrict `file:` storage; private browsing, clearing browser data, or moving the application may prevent restoration.
 
 ## Verification
 
-Open `tests/index.html` directly to run all **38 core checks** without dependencies. If Node is already installed, the same checks can run with:
+Before Phase 3 changes, all **38 core checks** and **68 Chrome checks** passed. The original assertions remain, except obsolete expectations that Hint/Solve were disabled or New Game returned the fixture. Coordinate-specific browser regressions deliberately load a valid legacy save; separate checks run actual generated games.
+
+Final result: **101 / 101 automated checks passed** (69 core and technique/integration checks plus 32 generation/calibration checks), and **100 / 100 Chrome checks passed**.
+
+Open `tests/index.html` directly to run the complete offline suite. With an already installed Node runtime, run:
 
 ```text
 node tests/run.cjs
-```
-
-The original baseline passed 17 core checks and 30 browser checks before changes. All Phase 1 behavior checks remain; the one core assertion and one browser assertion requiring Phase 2 features to stay deferred were updated for the new functionality.
-
-The additional core checks cover candidate input, fixed-state invariants, every peer type, manual deletion, atomic Auto Candidates, sequences A–D, exact multi-step Undo/Redo, branching, immutable snapshots, completion Undo/Redo, persistence of settings and both stacks, timer restoration, missing fields, 29 corrupt-state cases, and denied/full storage.
-
-The browser runner uses installed Chrome and built-in Node facilities only, with a fresh isolated profile under `.tmp/` and all external network access blocked:
-
-```text
 node tests/browser-check.cjs
+node tests/calibrate.cjs
 ```
 
-It defaults to Chrome's standard Windows installation path; `SUDOKU_CHROME` can specify another Chromium executable. This is an optional development check, not an application dependency. It passed **68 browser checks**, including real keyboard/mouse input, control availability, candidate geometry, all themes, refresh, closing/reopening a tab, a full browser process close/relaunch, persisted Undo/Redo, completion, corrupt storage fallback, denied storage, no JavaScript errors, and no external requests. Screenshots in `.tmp/` were visually checked in light/dark themes and at a compact 1366×768 desktop size.
+There is no npm dependency or installation step. The core runner covers exact solving/counting, invalid versus unsolvable boards, early exit at two solutions, every logical technique, both fish orientations, Coloring wrap/trap, negative patterns, deterministic inspection, replayable traces, and preservation of known solutions across 100 seeded candidate positions. It also covers Hint/Solve history, errors, completion/timer behavior, generation guards, backward-compatible persistence, corruption, and all Phase 1/2 candidate semantics.
+
+The generator suite creates **five puzzles per level**, independently verifies every solution and rating, replays every deduction against the correct solution, checks advanced reasoning requirements, tests variation, and asserts separated aggregate difficulty. It also tests event-loop yielding, cancellation, repeatable randomness, and explicit failure without fallback. Full tests take several minutes because they perform genuine Extreme generation.
+
+The Chrome runner uses the existing installed browser and built-in Node facilities, with a fresh isolated profile under `.tmp/`, hidden headless windows, and external network access blocked. `SUDOKU_CHROME` can specify another installed Chromium executable. It passed **100 browser checks**, covering real input, selection/highlighting, notes/peer removals, history shortcuts, themes, refresh/relaunch, all five generated levels, generation lockout/responsiveness, Hint → Undo → reload → Redo, Solve cancellation/confirmation, manual generated completion, corrupt/denied storage, no JavaScript errors, and no external requests. Light/dark candidate views, generation, and Extreme screenshots were visually checked, including the compact 1366×768 desktop layout.
+
+`tests/index.html?core` skips the long generation sample when used inside the browser regression runner, which already exercises generation through New Game. The default test page and command-line runner include it.
+
+## Practical limits
+
+Difficulty is calibrated against the implemented logical solver, not a universal human rating standard. Some unique puzzles need techniques this engine does not implement; they are rejected for rated generation. Extreme has variable generation time and no guarantee of a fixed latency. Browser scheduling can extend the wait. These limits do not relax uniqueness, logical solvability, or the Extreme acceptance criteria.

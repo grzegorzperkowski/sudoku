@@ -3,6 +3,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const project = path.resolve(__dirname, '..');
+// Preserve the original coordinate-based regressions using an actual legacy
+// save as test setup. Production startup and every New Game use the generator.
+global.window = global;
+for (const name of ['board', 'exact', 'logical', 'difficulty', 'generator', 'game', 'puzzles']) require('../js/' + name + '.js');
+const legacyStore = Sudoku.createGameStore(); legacyStore.actions.startGame(Sudoku.getDevelopmentPuzzle());
+const legacyState = JSON.parse(JSON.stringify(legacyStore.getState()));
+delete legacyState.puzzleDifficulty; delete legacyState.generating;
 const artifacts = path.join(project, '.tmp');
 fs.mkdirSync(artifacts, { recursive: true });
 const profile = fs.mkdtempSync(path.join(artifacts, 'phase2-browser-'));
@@ -28,6 +35,10 @@ chrome.stdio[4].on('data', (chunk) => {
     }
     if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails);
     if (message.method === 'Network.requestWillBeSent') network.push(message.params.request.url);
+    if (message.method === 'Page.javascriptDialogOpening') {
+      dialogs.push(message.params); const accept = nextDialogAnswer; nextDialogAnswer = true;
+      send('Page.handleJavaScriptDialog', { accept }).catch(error => errors.push(error));
+    }
   }
 });
 chrome.stderr.on('data', (chunk) => { if (chunk.toString().includes('FATAL')) console.error(chunk.toString()); });
@@ -39,6 +50,8 @@ let buffer = '';
 let errors = [];
 let network = [];
 let session;
+const dialogs = [];
+let nextDialogAnswer = true;
 launchBrowser();
 function send(method, params = {}, sessionId = session) {
   return new Promise((resolve, reject) => {
@@ -72,17 +85,26 @@ const valueAt = index => evaluate(`document.querySelector('${cell(index)} .cell-
 const selected = () => evaluate(`Number(document.querySelector('.is-selected').dataset.cell)`);
 async function screenshot(name) {
   const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
-  fs.writeFileSync(path.join(artifacts, 'phase2-' + name), Buffer.from(shot.data, 'base64'));
+  fs.writeFileSync(path.join(artifacts, 'phase3-' + name), Buffer.from(shot.data, 'base64'));
 }
 const saved = () => evaluate(`JSON.parse(localStorage.getItem('sudoku.game')).state`);
 const candidatesAt = index => evaluate(`Array.from(document.querySelector('${cell(index)} .cell-candidates').children).map(s=>s.textContent)`);
 const gameplay = state => ({ values: state.values, candidates: state.candidates, status: state.status });
 async function ready() {
-  for (let i = 0; i < 100; i++) {
-    if (await evaluate(`!window.__reloadPending && document.querySelectorAll('.cell').length === 81 && document.readyState === 'complete'`)) return;
+  for (let i = 0; i < 3600; i++) {
+    if (await evaluate(`!window.__reloadPending && document.querySelectorAll('.cell').length === 81 && document.readyState === 'complete' && !document.querySelector('#new-game').disabled`)) return;
     await delay(50);
   }
   throw new Error('Game did not load');
+}
+async function legacyFixture(settings = {}) {
+  const state = { ...legacyState, ...settings };
+  const injection = await send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('sudoku.game', ${JSON.stringify(JSON.stringify({ schemaVersion: 1, savedAt: Date.now(), state }))})` });
+  await reload();
+  await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: injection.identifier });
+}
+async function seedGeneration(seed = 3103) {
+  await evaluate(`(() => { const generate = Sudoku.generatePuzzle; Sudoku.generatePuzzle = (level, options = {}) => generate(level, { ...options, random: Sudoku.seededRandom(${seed}) }); })()`);
 }
 async function reload() {
   await evaluate(`window.__reloadPending = true`);
@@ -95,7 +117,7 @@ async function attach() {
   await send('Page.enable'); await send('Runtime.enable'); await send('Network.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: 1366, height: 768, deviceScaleFactor: 1, mobile: false });
 }
-const timeout = setTimeout(() => { console.error('Browser check timed out'); chrome.kill(); process.exitCode = 1; }, 55000);
+const timeout = setTimeout(() => { console.error('Browser check timed out'); chrome.kill(); process.exitCode = 1; }, 300000);
 (async () => {
   const target = await send('Target.createTarget', { url: 'about:blank' }, null);
   session = (await send('Target.attachToTarget', { targetId: target.targetId, flatten: true }, null)).sessionId;
@@ -105,11 +127,13 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   await send('Network.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: 1360, height: 1100, deviceScaleFactor: 1, mobile: false });
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });
+  const initialSave = await send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('sudoku.game', ${JSON.stringify(JSON.stringify({ schemaVersion: 1, savedAt: Date.now(), state: legacyState }))})` });
   await send('Page.navigate', { url: 'file:///' + project.replaceAll('\\', '/') + '/index.html' });
   for (let i = 0; i < 50; i++) {
     if (await evaluate(`document.querySelectorAll('.cell').length === 81 && document.readyState === 'complete'`)) break;
     await delay(50);
   }
+  await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: initialSave.identifier });
   check('9 rows and 81 cells render from file URL', await evaluate(`document.querySelectorAll('[role="row"]').length === 9 && document.querySelectorAll('[role="gridcell"]').length === 81`));
   check('30 givens and a square board', await evaluate(`document.querySelectorAll('.is-given').length === 30 && (() => {const r=document.querySelector('#board').getBoundingClientRect();return r.width===r.height;})()`));
   check('Thick box boundaries and thin internal boundaries', await evaluate(`getComputedStyle(document.querySelector('[data-cell="2"]')).borderRightWidth === '2px' && getComputedStyle(document.querySelector('[data-cell="1"]')).borderRightWidth === '1px'`));
@@ -140,7 +164,7 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   check('Onscreen keypad enters a digit and restores board focus', await valueAt(2) === '4' && await evaluate(`document.activeElement.dataset.cell === '2'`));
   await click('#erase');
   check('Erase clears a player value', await valueAt(2) === '');
-  check('Phase 2 controls enabled and Phase 3 Hint/Solve still disabled', await evaluate(`['Hint','Solve'].every(label=>Array.from(document.querySelectorAll('button')).some(b=>b.textContent.trim()===label&&b.disabled)) && ['undo','notes','auto-candidates'].every(id=>!document.getElementById(id).disabled) && document.querySelector('#redo').disabled`));
+  check('Phase 2 controls and implemented Hint/Solve are enabled', await evaluate(`['hint','solve','undo','notes','auto-candidates'].every(id=>!document.getElementById(id).disabled) && document.querySelector('#redo').disabled`));
   await select('#theme', 'dark');
   check('Manual Dark applies', await evaluate(`document.documentElement.dataset.theme === 'dark'`));
   await screenshot('dark.png');
@@ -157,8 +181,11 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   await delay(50);
   check('Auto follows a live system change to Light', await evaluate(`document.documentElement.dataset.theme === 'light'`));
   await select('#difficulty', 'Extreme');
+  await seedGeneration();
   await click('#new-game');
-  check('New Game retains requested difficulty and uses fixture', await evaluate(`document.querySelector('#difficulty').value === 'Extreme' && document.querySelectorAll('.is-given').length === 30 && !document.querySelector('.is-selected')`));
+  await ready();
+  check('New Game retains requested difficulty and generates a verified Extreme puzzle', await evaluate(`document.querySelector('#difficulty').value === 'Extreme' && document.querySelector('#puzzle-label').textContent === 'Extreme puzzle' && !document.querySelector('.is-selected') && Sudoku.analyzeDifficulty(JSON.parse(localStorage.getItem('sudoku.game')).state.givens).difficulty === 'Extreme'`));
+  await legacyFixture({ difficulty: 'Extreme' });
   await delay(1500);
   check('Timer advances while active', await evaluate(`document.querySelector('#timer').textContent !== '00:00:00'`));
   await click(cell(2)); await key('4', 'Digit4');
@@ -233,7 +260,9 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   await click('#undo'); check('Undo completion reopens the board', await evaluate(`document.querySelector('#completion').hidden && document.querySelector('#game-status').textContent === 'In progress'`));
   await click('#redo'); check('Redo completion stops play again', await evaluate(`!document.querySelector('#completion').hidden && document.querySelector('[data-digit="1"]').disabled`));
   await click('#new-game');
+  await ready();
   check('New Game clears persisted old puzzle history and candidates', (await saved()).history.length === 0 && (await saved()).future.length === 0 && (await saved()).candidates.every(digits=>digits.length===0));
+  await legacyFixture({ difficulty: 'Hard', theme: 'dark' });
   await send('Emulation.setDeviceMetricsOverride', { width: 1366, height: 768, deviceScaleFactor: 1, mobile: false });
   check('Board and game actions fit a 1366 by 768 desktop', await evaluate(`document.querySelector('#board').getBoundingClientRect().bottom <= innerHeight && document.querySelector('.game-actions').getBoundingClientRect().bottom <= innerHeight`));
   await screenshot('compact.png');
@@ -257,23 +286,96 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   assert.deepEqual(afterBrowserClose.history, beforeBrowserClose.history); assert.deepEqual(afterBrowserClose.future, beforeBrowserClose.future);
   check('Full browser close and relaunch retains board, candidates, Undo/Redo, and elapsed time', afterBrowserClose.elapsedTime >= beforeBrowserClose.elapsedTime);
   await click('#redo'); check('Redo still works after full browser relaunch', !(await saved()).candidates[2].includes(4));
+  // Phase 3: exercise real generation through the application's UI. A seeded
+  // random source stabilizes timing; no generator result is stubbed or cached.
+  const beforeCancel = await saved(), dialogCount = dialogs.length;
+  nextDialogAnswer = false; await click('#new-game');
+  assert.deepEqual(gameplay(await saved()), gameplay(beforeCancel));
+  check('Cancelling New Game preserves an unfinished game and its history', dialogs.length === dialogCount + 1 && (await saved()).history.length === beforeCancel.history.length);
+  const generatedBoards = [];
+  for (const difficulty of ['Easy','Normal','Hard','Expert','Extreme']) {
+    await select('#difficulty', difficulty); await seedGeneration();
+    const old = await saved();
+    if (old.puzzleDifficulty) check('Selecting ' + difficulty + ' preserves the active puzzle rating', await evaluate(`document.querySelector('#puzzle-label').textContent`) === old.puzzleDifficulty + ' puzzle');
+    await click('#new-game');
+    if (difficulty === 'Extreme') {
+      check('Extreme shows generation progress and disables conflicting controls', await evaluate(`document.querySelector('#board').getAttribute('aria-busy') === 'true' && !document.querySelector('#generation-status').hidden && ['new-game','restart','hint','solve','notes','auto-candidates','undo','redo','difficulty'].every(id => document.getElementById(id).disabled)`));
+      await evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key:'1', bubbles:true }));`);
+      assert.deepEqual(gameplay(await saved()), gameplay(old));
+      await select('#theme', 'light');
+      check('Appearance remains responsive during Extreme generation', await evaluate(`document.documentElement.dataset.theme === 'light'`));
+      await screenshot('generating.png');
+    }
+    await ready();
+    const state = await saved(); generatedBoards.push(state.givens.join(''));
+    check(difficulty + ' New Game initializes a unique, logically solved puzzle of the requested class',
+      Sudoku.validateGeneratedPuzzle({ givens: state.givens, solution: state.solution, difficulty }) && state.puzzleDifficulty === difficulty);
+    check(difficulty + ' initialization resets notes, selection, history, timer and persists', state.status === 'active' && state.selectedCell === null && !state.history.length && !state.future.length && state.candidates.every(list => !list.length) && state.elapsedTime < 1000);
+    if (difficulty === 'Extreme') {
+      const report = Sudoku.analyzeDifficulty(state.givens);
+      check('Extreme has substantial advanced work and exceeds the Expert score ceiling', report.score >= 700 && report.advancedSteps >= 4 && report.eliminationCount >= 25 && report.steps.length >= 65);
+      await click('#auto-candidates'); await click('#hint');
+      check('Extreme accepts play and one Hint after initialization', (await saved()).values.filter((value, cell) => value !== state.givens[cell]).length === 1);
+      await screenshot('extreme.png');
+    }
+    if (difficulty !== 'Normal') continue;
+    if (state.notesMode) await click('#notes');
+    await click('#auto-candidates'); const auto = await saved();
+    assert.deepEqual(auto.candidates, Sudoku.Board.candidateMasks(auto.values).map(mask => Sudoku.Board.digits[mask]));
+    check('Auto Candidates calculates direct legal notes on a generated puzzle', auto.history.length === 1);
+    const editable = auto.values.findIndex((value, cell) => !value && Sudoku.Board.peers[cell].some(peer => auto.candidates[peer].includes(auto.solution[cell])));
+    assert(editable >= 0); await click(cell(editable));
+    const wrong = auto.solution[editable] % 9 + 1; await key(String(wrong), 'Digit' + wrong);
+    check('Incorrect input is checked against the generated solution', await evaluate(`document.querySelector('${cell(editable)}').getAttribute('aria-invalid') === 'true'`));
+    await click('#undo'); const beforeEntry = gameplay(await saved());
+    await key(String(auto.solution[editable]), 'Digit' + auto.solution[editable]); const afterEntry = gameplay(await saved());
+    check('Correct input clears the error and removes generated peer candidates', await evaluate(`document.querySelector('${cell(editable)}').getAttribute('aria-invalid') === 'false'`) && Sudoku.Board.peers[editable].every(peer => !afterEntry.candidates[peer].includes(auto.solution[editable])));
+    await click('#undo'); assert.deepEqual(gameplay(await saved()), beforeEntry);
+    await click('#redo'); assert.deepEqual(gameplay(await saved()), afterEntry);
+    check('Generated value entry Undo and Redo restore exact candidate state', true);
+    const beforeHint = await saved(); await click('#hint'); const afterHint = await saved();
+    const changes = afterHint.values.map((value, cell) => value !== beforeHint.values[cell] ? cell : -1).filter(cell => cell >= 0);
+    check('Hint fills exactly one correct generated digit and records one action', changes.length === 1 && afterHint.values[changes[0]] === afterHint.solution[changes[0]] && afterHint.history.length === beforeHint.history.length + 1);
+    await click('#undo'); assert.deepEqual(gameplay(await saved()), gameplay(beforeHint));
+    check('Hint Undo restores all values and candidate notes exactly', true);
+    await reload(); assert.deepEqual(gameplay(await saved()), gameplay(beforeHint));
+    assert.deepEqual((await saved()).future, afterHint.future.concat([gameplay(afterHint)]));
+    await click('#redo'); assert.deepEqual(gameplay(await saved()), gameplay(afterHint));
+    check('Refreshing a generated game preserves candidates and redoable Hint', (await saved()).puzzleDifficulty === 'Normal');
+    await screenshot('generated-notes.png');
+    const beforeSolve = await saved(), beforeDialog = dialogs.length;
+    nextDialogAnswer = false; await click('#solve'); assert.deepEqual(gameplay(await saved()), gameplay(beforeSolve));
+    check('Solve cancellation preserves the entire generated board', dialogs.length === beforeDialog + 1);
+    await click('#solve'); const solved = await saved();
+    check('Confirmed Solve completes through state, clears notes and records one history action', solved.status === 'completed' && solved.values.join('') === solved.solution.join('') && solved.candidates.every(list => !list.length) && solved.history.length === beforeSolve.history.length + 1);
+    await delay(1100); await reload();
+    check('Solved generated board persists with a frozen timer and completion UI', (await saved()).elapsedTime === solved.elapsedTime && await evaluate(`!document.querySelector('#completion').hidden`));
+    await click('#undo'); assert.deepEqual(gameplay(await saved()), gameplay(beforeSolve));
+    await click('#redo'); assert.deepEqual(gameplay(await saved()), gameplay(solved));
+    check('Solve Undo and Redo restore exact generated gameplay and completion', true);
+    await click('#undo');
+    await evaluate(`(() => {const s=JSON.parse(localStorage.getItem('sudoku.game')).state;for(let cell=0;cell<81;cell++){if(s.givens[cell])continue;const el=document.querySelector('[data-cell="'+cell+'"]');el.click();el.dispatchEvent(new KeyboardEvent('keydown',{key:String(s.solution[cell]),bubbles:true}));}})()`);
+    check('Manually completing a generated puzzle triggers normal completion and stops play', (await saved()).status === 'completed' && await evaluate(`!document.querySelector('#completion').hidden && document.querySelector('#hint').disabled && document.querySelector('#solve').disabled`));
+  }
+  check('Repeated New Game produces five distinct generated boards', new Set(generatedBoards).size === 5);
   // Corrupt only this runner's isolated profile, never the user's browser data.
   for (const bad of ['{', JSON.stringify({schemaVersion: 999, state: {}})]) {
     // Inject after the old document's pagehide autosave, before startup reads.
     const injection = await send('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('sudoku.game', ${JSON.stringify(bad)})` });
     await reload();
     await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: injection.identifier });
-    check('Bad JSON or incompatible schema falls back to a playable clean game', (await saved()).history.length === 0 && await valueAt(2) === '');
+    check('Bad JSON or incompatible schema falls back to a playable generated game', (await saved()).history.length === 0 && (await saved()).status === 'active' && (await saved()).puzzleDifficulty === 'Normal');
   }
   const corruptHistory = await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {const e=JSON.parse(localStorage.getItem('sudoku.game'));e.state.future=[{values:[],candidates:[],status:'active'}];localStorage.setItem('sudoku.game',JSON.stringify(e));})()` });
   await reload(); check('Corrupt nested history falls back safely in the browser', (await saved()).future.length === 0 && (await saved()).history.length === 0);
   await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: corruptHistory.identifier });
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `Object.defineProperty(window,'localStorage',{get(){throw new Error('Storage blocked in test');}});` });
-  await reload(); await click(cell(2)); await key('4', 'Digit4'); await click('#undo');
-  check('Denied browser storage shows save failure and keeps play/Undo usable', await valueAt(2) === '' && await evaluate(`!document.querySelector('#persistence-status').hidden && !document.querySelector('#redo').disabled`));
-  await send('Page.navigate', { url: 'file:///' + project.replaceAll('\\', '/') + '/tests/index.html' });
+  await reload(); const deniedEmpty = await evaluate(`Number(document.querySelector('.cell:not(.is-given)').dataset.cell)`);
+  await click(cell(deniedEmpty)); await key('4', 'Digit4'); await click('#undo');
+  check('Denied browser storage shows save failure and keeps play/Undo usable', await valueAt(deniedEmpty) === '' && await evaluate(`!document.querySelector('#persistence-status').hidden && !document.querySelector('#redo').disabled`));
+  await send('Page.navigate', { url: 'file:///' + project.replaceAll('\\', '/') + '/tests/index.html?core' });
   for (let i=0;i<100;i++) { if (await evaluate(`document.querySelector('#summary')?.textContent.includes('checks passed')`)) break; await delay(30); }
-  check('Core regression page passes in the browser', await evaluate(`document.querySelector('#summary').className === 'passed' && document.querySelectorAll('#results li').length === 38`));
+  check('Core regression page passes in the browser', await evaluate(`document.querySelector('#summary').className === 'passed' && document.querySelectorAll('#results li').length === SudokuTestResults.length && SudokuTestResults.length >= 67`));
   check('No application JavaScript errors', errors.length === 0);
   check('No application network requests', network.every(url => url.startsWith('file:') || url.startsWith('data:')));
   console.log(JSON.stringify({ passed: passed.length, checks: passed, layout, errors, requests: network }, null, 2));
