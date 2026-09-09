@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sudoku · Phase 1 checks</title>
+  <style>
+    :root { color-scheme: light dark; font: 16px/1.5 system-ui, sans-serif; }
+    body { max-width: 900px; margin: 48px auto; padding: 0 24px; }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    p { margin: 0 0 24px; }
+    li { padding: 10px 0; border-bottom: 1px solid #8885; }
+    .passed { color: light-dark(#176237, #83dfaa); }
+    .failed { color: light-dark(#a21b31, #ff9bac); }
+    pre { white-space: pre-wrap; font-size: 13px; }
+  </style>
+  <script defer src="../js/game.js"></script>
+  <script defer src="../js/puzzles.js"></script>
+  <script defer src="tests.js"></script>
+</head>
+<body>
+  <h1>Sudoku · Phase 1 checks</h1>
+  <p>Offline checks of puzzle data, central actions, serialization, and timer behavior.</p>
+  <p id="summary" role="status">Running…</p>
+  <ol id="results"></ol>
+  <p><a href="../index.html">Open the application</a></p>
+</body>
+</html>

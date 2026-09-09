@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="A quiet place to play Sudoku. A fully offline desktop application.">
+  <title>Sudoku — Find your focus</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Classic deferred scripts also work when index.html is opened from file://. -->
+  <script defer src="js/game.js"></script>
+  <script defer src="js/puzzles.js"></script>
+  <script defer src="js/view.js"></script>
+  <script defer src="js/app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <a class="brand" href="index.html" aria-label="Sudoku home">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span>Sudoku<span class="brand-dot">.</span></span>
+      </a>
+      <div class="theme-control">
+        <label for="theme">Appearance</label>
+        <select id="theme" aria-label="Color theme">
+          <option value="auto">Auto</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </div>
+    </header>
+
+    <main>
+      <div class="page-heading">
+        <div><p class="eyebrow">A LITTLE SPACE TO THINK</p><h1>Find your focus.</h1><p class="intro">One grid. Nine numbers. Your own pace.</p></div>
+        <span class="offline-label"><span aria-hidden="true"></span>Made to play offline</span>
+      </div>
+
+      <div class="workspace">
+        <section class="board-section" aria-label="Sudoku game">
+          <div class="board-heading">
+            <div><span class="puzzle-label">Development puzzle</span><span id="game-status" class="game-status">In progress</span></div>
+            <div class="timer-block"><span class="timer-label">TIME</span><time id="timer" role="timer" aria-label="Elapsed time">00:00:00</time></div>
+          </div>
+          <div id="board" class="board" role="grid" aria-label="Sudoku puzzle" aria-rowcount="9" aria-colcount="9" aria-describedby="keyboard-help"></div>
+          <div class="board-footer">
+            <div class="history-controls" aria-label="History controls, available in Phase 2">
+              <button type="button" class="button button-quiet" disabled title="Undo will be available in Phase 2"><span aria-hidden="true">↶</span> Undo</button>
+              <button type="button" class="button button-quiet" disabled title="Redo will be available in Phase 2"><span aria-hidden="true">↷</span> Redo</button>
+            </div>
+            <div class="progress-block"><span id="filled-count">30 <span>/ 81 filled</span></span><div id="progress" class="progress-track" role="progressbar" aria-label="Cells filled" aria-valuemin="0" aria-valuemax="81" aria-valuenow="30"><span id="progress-fill"></span></div></div>
+          </div>
+          <div id="completion" class="completion" role="status" aria-live="polite" hidden><span class="completion-mark" aria-hidden="true">✓</span><div><h2>Beautifully done.</h2><p id="completion-message"></p></div></div>
+          <div class="board-legend" aria-label="Cell styles"><span><b class="legend-given">5</b> Given</span><span><b class="legend-player">5</b> Your entry</span><span><b class="legend-error">5</b> Incorrect</span></div>
+          <p id="keyboard-help" class="keyboard-help"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> to move <span>·</span> <kbd>1–9</kbd> to enter <span>·</span> <kbd>Del</kbd> / <kbd>⌫</kbd> to erase</p>
+        </section>
+
+        <aside class="control-panel" aria-label="Game controls">
+          <div class="difficulty-control">
+            <label class="control-label" for="difficulty">Difficulty</label>
+            <select id="difficulty" aria-describedby="difficulty-help">
+              <option>Easy</option><option selected>Normal</option><option>Hard</option><option>Expert</option><option>Extreme</option>
+            </select>
+            <p id="difficulty-help" class="helper-text">All levels use the same ungraded test puzzle. Generation arrives in Phase 3.</p>
+          </div>
+          <div class="panel-divider"></div>
+          <div class="input-heading"><h2>Place a number</h2><span id="selection-label">Select a cell</span></div>
+          <div id="keypad" class="keypad" role="group" aria-label="Enter a number">
+            <button type="button" data-digit="1" aria-label="Enter 1">1</button><button type="button" data-digit="2" aria-label="Enter 2">2</button><button type="button" data-digit="3" aria-label="Enter 3">3</button>
+            <button type="button" data-digit="4" aria-label="Enter 4">4</button><button type="button" data-digit="5" aria-label="Enter 5">5</button><button type="button" data-digit="6" aria-label="Enter 6">6</button>
+            <button type="button" data-digit="7" aria-label="Enter 7">7</button><button type="button" data-digit="8" aria-label="Enter 8">8</button><button type="button" data-digit="9" aria-label="Enter 9">9</button>
+          </div>
+          <button id="erase" type="button" class="button erase-button"><span aria-hidden="true">⌫</span> Erase</button>
+          <p id="selection-help" class="selection-help" aria-live="polite">Choose any empty cell to begin.</p>
+          <div class="panel-divider"></div>
+          <div class="tools-heading"><h2>Assistance</h2><span class="coming-label">COMING LATER</span></div>
+          <div class="future-controls" aria-label="Future features">
+            <button type="button" class="button" disabled title="Notes will be available in Phase 2">Notes</button>
+            <button type="button" class="button" disabled title="Auto Candidates will be available in Phase 2">Auto Candidates</button>
+            <button type="button" class="button" disabled title="Hints will be available in Phase 3">Hint</button>
+            <button type="button" class="button" disabled title="Solve will be available in Phase 3">Solve</button>
+          </div>
+          <div class="panel-divider"></div>
+          <div class="game-actions">
+            <button id="new-game" type="button" class="button button-primary">New Game <span aria-hidden="true">↗</span></button>
+            <button id="restart" type="button" class="button restart-button"><span aria-hidden="true">↻</span> Restart</button>
+          </div>
+        </aside>
+      </div>
+    </main>
+    <footer class="app-footer"><span>Every number has its place.</span><span>PHASE 01 <span aria-hidden="true">/</span> LOCAL PLAY</span></footer>
+  </div>
+  <noscript><p class="noscript">Please enable JavaScript to play this offline Sudoku game.</p></noscript>
+</body>
+</html>
