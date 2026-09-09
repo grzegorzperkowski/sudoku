@@ -291,7 +291,7 @@
     sameData(store.getState().givens, givens);
   });
 
-  test("Candidate slots and history placeholders remain empty and independently addressable", () => {
+  test("Candidate slots start empty and independently addressable; value edits record history", () => {
     const { store, emptyCell } = newGame();
     const state = store.getState();
     equal(state.candidates.length, 81);
@@ -300,9 +300,9 @@
     store.actions.selectCell(emptyCell);
     store.actions.setCellValue(4);
     store.actions.clearCell();
-    sameData(store.getState().history, [], "History is deferred to Phase 2.");
-    sameData(store.getState().future, [], "Redo is deferred to Phase 2.");
-    assert(store.getState().candidates.every((digits) => digits.length === 0), "Candidate editing must remain unimplemented.");
+    equal(store.getState().history.length, 2, "Entry and deletion each record one history step.");
+    sameData(store.getState().future, []);
+    assert(store.getState().candidates.every((digits) => digits.length === 0), "Value entry and deletion do not generate notes.");
   });
 
   test("Theme preference and operating-system theme are independent serializable state", () => {
@@ -358,13 +358,17 @@
     checkPlain(state);
   });
 
+  // Phase 2 tests share the dependency-free runner and its assertions.
+  globalThis.SudokuTests = { test, assert, equal, sameData, throws, newGame, results };
   globalThis.SudokuTestResults = results;
-  if (typeof document !== "undefined") {
+  globalThis.renderSudokuTestResults = function () {
+    if (typeof document === "undefined") return;
     const passed = results.filter((result) => result.passed).length;
     const summary = document.getElementById("summary");
     summary.textContent = `${passed} of ${results.length} checks passed.`;
     summary.className = passed === results.length ? "passed" : "failed";
     const list = document.getElementById("results");
+    list.replaceChildren();
     results.forEach((result) => {
       const item = document.createElement("li");
       item.className = result.passed ? "passed" : "failed";
@@ -376,5 +380,6 @@
       }
       list.append(item);
     });
-  }
+  };
+  globalThis.renderSudokuTestResults();
 }());

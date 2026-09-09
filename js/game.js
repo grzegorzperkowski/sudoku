@@ -29,6 +29,7 @@
       elapsedTime: 0,
       theme: "auto",
       systemTheme: "light",
+      notesMode: false,
       history: [],
       future: []
     });
@@ -119,14 +120,32 @@
     return nextState;
   }
 
+  function isPeer(first, second) {
+    if (first === second) return false;
+    const row = Math.floor(first / 9), column = first % 9;
+    const otherRow = Math.floor(second / 9), otherColumn = second % 9;
+    return row === otherRow || column === otherColumn ||
+      (Math.floor(row / 3) === Math.floor(otherRow / 3) && Math.floor(column / 3) === Math.floor(otherColumn / 3));
+  }
+
+  function canEdit(state) {
+    return state.status === "active" && state.selectedCell !== null && state.givens[state.selectedCell] === 0;
+  }
+
   function updateCellValue(state, value, elapsedTime) {
     const index = state.selectedCell;
-    if (state.status !== "active" || index === null || state.givens[index] !== 0 || state.values[index] === value) {
+    if (!canEdit(state) || (state.values[index] === value && state.candidates[index].length === 0)) {
       return state;
     }
     const values = state.values.slice();
     values[index] = value;
-    const nextState = { ...state, values };
+    const candidates = state.candidates.map((digits, peer) => {
+      if (peer === index) return [];
+      // Deletion never regenerates notes. Each peer is visited once, even if it
+      // shares both a row/column and box with the entered cell.
+      return value !== 0 && isPeer(index, peer) ? digits.filter(digit => digit !== value) : digits;
+    });
+    const nextState = { ...state, values, candidates };
     if (isComplete(nextState)) {
       nextState.status = "completed";
       nextState.elapsedTime = elapsedTime;
@@ -134,8 +153,42 @@
     return nextState;
   }
 
-  // One reducer boundary keeps each edit atomic. Phase 2 can capture values and
-  // candidates together here, including exact before/after candidate snapshots.
+  function toggleCandidate(state, digit) {
+    if (!canEdit(state) || state.values[state.selectedCell] !== 0 || !Number.isInteger(digit) || digit < 1 || digit > 9) return state;
+    const candidates = state.candidates.slice();
+    const previous = candidates[state.selectedCell];
+    candidates[state.selectedCell] = previous.includes(digit) ? previous.filter(value => value !== digit) :
+      [...previous, digit].sort((a, b) => a - b);
+    return { ...state, candidates };
+  }
+
+  function autoCandidates(state) {
+    if (state.status !== "active") return state;
+    const candidates = state.values.map((value, index) => {
+      if (value !== 0 || state.givens[index] !== 0) return [];
+      const occupied = new Set(state.values.filter((digit, peer) => isPeer(index, peer)));
+      return Array.from({ length: 9 }, (_, digit) => digit + 1).filter(digit => !occupied.has(digit));
+    });
+    return candidates.every((digits, index) => digits.join() === state.candidates[index].join()) ? state : { ...state, candidates };
+  }
+
+  // Snapshots contain only gameplay data, never history, puzzle input, settings,
+  // or clocks. Frozen nested arrays can safely be shared between snapshots.
+  function gameplaySnapshot(state) {
+    return { values: state.values, candidates: state.candidates, status: state.status };
+  }
+
+  function travelHistory(state, undo) {
+    const source = undo ? state.history : state.future;
+    if (source.length === 0) return state;
+    const snapshot = source[source.length - 1];
+    return {
+      ...state, ...snapshot,
+      history: undo ? source.slice(0, -1) : [...state.history, gameplaySnapshot(state)],
+      future: undo ? [...state.future, gameplaySnapshot(state)] : source.slice(0, -1)
+    };
+  }
+
   function reduceGameState(state, action) {
     switch (action.type) {
       case "START_GAME":
@@ -158,6 +211,19 @@
           updateCellValue(state, action.value, action.elapsedTime);
       case "CLEAR_CELL":
         return updateCellValue(state, 0, action.elapsedTime);
+      case "INPUT_DIGIT":
+        return state.notesMode ? toggleCandidate(state, action.value) :
+          reduceGameState(state, { ...action, type: "SET_CELL_VALUE" });
+      case "TOGGLE_CANDIDATE":
+        return toggleCandidate(state, action.value);
+      case "AUTO_CANDIDATES":
+        return autoCandidates(state);
+      case "TOGGLE_NOTES_MODE":
+        return { ...state, notesMode: !state.notesMode };
+      case "UNDO":
+        return travelHistory(state, true);
+      case "REDO":
+        return travelHistory(state, false);
       case "SET_DIFFICULTY":
         return !DIFFICULTIES.includes(action.difficulty) || action.difficulty === state.difficulty ? state :
           { ...state, difficulty: action.difficulty };
@@ -175,9 +241,43 @@
     }
   }
 
-  function createGameStore({ now } = {}) {
+  function validateSavedState(saved) {
+    const puzzle = validatePuzzle(saved, "Normal");
+    function validateSnapshot(snapshot) {
+      if (!snapshot || typeof snapshot !== "object" || Object.keys(snapshot).some(key => !["values", "candidates", "status"].includes(key))) {
+        throw new TypeError("Invalid gameplay snapshot.");
+      }
+      validateDigits(snapshot.values, "values", 0);
+      if (!puzzle.givens.every((value, index) => value === 0 || value === snapshot.values[index])) throw new TypeError("Saved givens were changed.");
+      if (!Array.isArray(snapshot.candidates) || snapshot.candidates.length !== CELL_COUNT) throw new TypeError("Invalid candidates.");
+      const candidates = Array.from(snapshot.candidates, (digits, index) => {
+        if (!Array.isArray(digits) || digits.length > 9 || !Array.from(digits).every(digit => Number.isInteger(digit) && digit >= 1 && digit <= 9) ||
+            new Set(digits).size !== digits.length || (snapshot.values[index] !== 0 && digits.length !== 0)) throw new TypeError("Invalid candidate digits.");
+        return digits.slice().sort((a, b) => a - b);
+      });
+      const status = isComplete({ values: snapshot.values, solution: puzzle.solution }) ? "completed" : "active";
+      if (snapshot.status !== status) throw new TypeError("Invalid saved status.");
+      return { values: snapshot.values.slice(), candidates, status };
+    }
+    const gameplay = validateSnapshot(gameplaySnapshot(saved));
+    if (!Number.isSafeInteger(saved.elapsedTime) || saved.elapsedTime < 0) throw new TypeError("Invalid elapsed time.");
+    if (!Array.isArray(saved.history) || !Array.isArray(saved.future)) throw new TypeError("Invalid history.");
+    const selectedCell = saved.selectedCell === undefined ? null : saved.selectedCell;
+    const theme = saved.theme === undefined ? "auto" : saved.theme;
+    const notesMode = saved.notesMode === undefined ? false : saved.notesMode;
+    if ((selectedCell !== null && !isCellIndex(selectedCell)) || !["auto", "light", "dark"].includes(theme) || typeof notesMode !== "boolean") {
+      throw new TypeError("Invalid saved settings.");
+    }
+    return deepFreeze({
+      ...createInitialState(), ...puzzle, ...gameplay, selectedCell, theme, notesMode,
+      elapsedTime: saved.elapsedTime,
+      history: Array.from(saved.history, validateSnapshot), future: Array.from(saved.future, validateSnapshot)
+    });
+  }
+
+  function createGameStore({ now, initialState } = {}) {
     const clock = now || (() => global.performance ? global.performance.now() : Date.now());
-    let state = createInitialState();
+    let state = initialState ? validateSavedState(initialState) : createInitialState();
     let startedAt = null;
     const listeners = new Set();
 
@@ -194,17 +294,22 @@
     }
 
     function dispatch(action) {
-      if (["SET_CELL_VALUE", "CLEAR_CELL", "TICK"].includes(action.type)) {
-        action = { ...action, elapsedTime: currentElapsedTime() };
-      }
+      action = { ...action, elapsedTime: currentElapsedTime() };
       const previousState = state;
-      const nextState = reduceGameState(previousState, action);
+      let nextState = reduceGameState(previousState, action);
       if (nextState === previousState) return state;
+
+      const edit = ["SET_CELL_VALUE", "CLEAR_CELL", "INPUT_DIGIT", "TOGGLE_CANDIDATE", "AUTO_CANDIDATES"].includes(action.type);
+      if (edit) {
+        nextState = { ...nextState, history: [...state.history, gameplaySnapshot(state)], future: [] };
+      }
 
       if (action.type === "START_GAME" || action.type === "RESTART_GAME") {
         startedAt = nextState.status === "active" ? readClock() : null;
-      } else if (nextState.status !== "active") {
-        startedAt = null;
+      } else {
+        nextState = { ...nextState, elapsedTime: action.elapsedTime };
+        if (nextState.status !== "active") startedAt = null;
+        else if (previousState.status !== "active") startedAt = readClock() - nextState.elapsedTime;
       }
 
       state = deepFreeze(nextState);
@@ -213,8 +318,11 @@
       return nextState;
     }
 
+    if (state.status === "active") startedAt = readClock() - state.elapsedTime;
+
     return Object.freeze({
       getState: () => state,
+      captureState: () => deepFreeze({ ...state, elapsedTime: currentElapsedTime() }),
       subscribe(listener) {
         if (typeof listener !== "function") throw new TypeError("A state subscriber must be a function.");
         listeners.add(listener);
@@ -226,6 +334,12 @@
         selectCell: index => dispatch({ type: "SELECT_CELL", index }),
         moveSelection: (deltaRow, deltaColumn) => dispatch({ type: "MOVE_SELECTION", deltaRow, deltaColumn }),
         setCellValue: value => dispatch({ type: "SET_CELL_VALUE", value }),
+        inputDigit: value => dispatch({ type: "INPUT_DIGIT", value }),
+        toggleCandidate: value => dispatch({ type: "TOGGLE_CANDIDATE", value }),
+        toggleNotesMode: () => dispatch({ type: "TOGGLE_NOTES_MODE" }),
+        autoCandidates: () => dispatch({ type: "AUTO_CANDIDATES" }),
+        undo: () => dispatch({ type: "UNDO" }),
+        redo: () => dispatch({ type: "REDO" }),
         clearCell: () => dispatch({ type: "CLEAR_CELL" }),
         setDifficulty: difficulty => dispatch({ type: "SET_DIFFICULTY", difficulty }),
         setTheme: theme => dispatch({ type: "SET_THEME", theme }),
@@ -238,6 +352,7 @@
   Object.assign(Sudoku, {
     DIFFICULTIES,
     createGameStore,
+    validateSavedState,
     isCellIncorrect,
     isComplete,
     formatElapsedTime
