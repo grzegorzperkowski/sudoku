@@ -212,6 +212,77 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   await click(cell(0)); await key('7', 'Digit7');
   check('Notes cannot be added to givens', await valueAt(0) === '5' && (await candidatesAt(0)).every(digit=>digit===''));
   await click('#notes'); await click('#restart');
+  // Candidate highlighting is entirely derived from the selected normal value.
+  // Seed the same mixed notes in several cells so the checks can distinguish a
+  // matching digit from its unchanged siblings.
+  await click('#notes');
+  for (const index of [2,10,11,40]) {
+    await click(cell(index));
+    for (const digit of [2,4,7,9]) await key(String(digit), 'Digit' + digit);
+  }
+  await click('#notes'); await click(cell(4));
+  check('Selecting normal 7 preserves same-number cells and emphasizes every candidate 7 in Light theme', await evaluate(`(() => {
+    const slots = Array.from(document.querySelectorAll('.cell-candidates > span'));
+    const highlights = slots.filter(slot => slot.classList.contains('is-matching'));
+    return document.documentElement.dataset.theme === 'light' &&
+      document.querySelectorAll('.cell.is-matching').length === 3 && highlights.length === 4 &&
+      highlights.every(slot => slot.textContent === '7' && getComputedStyle(slot).fontWeight === '800') &&
+      [2,10,11,40].every(index => [1,3,8].every(position => !document.querySelector('[data-cell="' + index + '"] .cell-candidates').children[position].classList.contains('is-matching')));
+  })()`));
+  await click(cell(36));
+  check('Changing selection from 7 to normal 4 clears 7 notes and emphasizes only candidate 4', await evaluate(`(() => {
+    const slots = Array.from(document.querySelectorAll('.cell-candidates > span'));
+    const highlights = slots.filter(slot => slot.classList.contains('is-matching'));
+    return document.querySelectorAll('.cell.is-matching').length === 2 && highlights.length === 4 &&
+      highlights.every(slot => slot.textContent === '4') &&
+      !slots.some(slot => slot.textContent === '7' && slot.classList.contains('is-matching'));
+  })()`));
+  await select('#theme', 'dark');
+  check('Candidate 4 emphasis keeps bold, distinct contrast in Dark theme', await evaluate(`(() => {
+    const highlighted = document.querySelector('${cell(2)} .cell-candidates').children[3];
+    const plain = document.querySelector('${cell(2)} .cell-candidates').children[1];
+    return document.documentElement.dataset.theme === 'dark' && highlighted.classList.contains('is-matching') &&
+      getComputedStyle(highlighted).fontWeight === '800' && getComputedStyle(highlighted).color === 'rgb(255, 209, 124)' &&
+      getComputedStyle(highlighted).color !== getComputedStyle(plain).color;
+  })()`));
+  await select('#theme', 'auto');
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] }); await delay(50);
+  check('Candidate emphasis remains visible when Auto resolves to Light', await evaluate(`document.documentElement.dataset.theme === 'light' && document.querySelector('${cell(2)} .cell-candidates').children[3].classList.contains('is-matching')`));
+  await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] }); await delay(50);
+  check('Candidate emphasis remains visible when Auto resolves to Dark', await evaluate(`document.documentElement.dataset.theme === 'dark' && document.querySelector('${cell(2)} .cell-candidates').children[3].classList.contains('is-matching')`));
+  await click(cell(2));
+  check('Selecting an empty cell clears all candidate highlighting', await evaluate(`!document.querySelector('.cell-candidates > span.is-matching')`));
+  await key('7', 'Digit7');
+  check('Entering 7 immediately highlights remaining non-peer candidate 7 notes', await evaluate(`(() => {
+    const matches = Array.from(document.querySelectorAll('.cell-candidates > span.is-matching'));
+    return matches.length === 1 && matches[0] === document.querySelector('${cell(40)} .cell-candidates').children[6];
+  })()`));
+  await key('Delete');
+  check('Deleting the selected normal value clears candidate highlighting immediately', await evaluate(`!document.querySelector('.cell-candidates > span.is-matching')`));
+  await click('#undo');
+  check('Undo restores candidate highlighting with the restored selected value', await evaluate(`document.querySelectorAll('.cell-candidates > span.is-matching').length === 1 && document.querySelector('${cell(40)} .cell-candidates').children[6].classList.contains('is-matching')`));
+  await click('#redo');
+  check('Redo clears candidate highlighting after restoring the empty selection', await evaluate(`!document.querySelector('.cell-candidates > span.is-matching')`));
+  await click('#notes'); await key('7', 'Digit7'); await click('#notes'); await click(cell(4));
+  check('Manually adding a candidate updates the next selected-number highlight', await evaluate(`document.querySelectorAll('.cell-candidates > span.is-matching').length === 2 && document.querySelector('${cell(2)} .cell-candidates').children[6].classList.contains('is-matching')`));
+  await click(cell(2)); await click('#notes'); await key('7', 'Digit7'); await click('#notes'); await click(cell(4));
+  check('Manually removing a candidate leaves no stale matching candidate highlight', await evaluate(`document.querySelectorAll('.cell-candidates > span.is-matching').length === 1 && !document.querySelector('${cell(2)} .cell-candidates').children[6].classList.contains('is-matching')`));
+  await click(cell(36)); await click('#auto-candidates');
+  check('Auto Candidates recalculates the visible matching candidates', await evaluate(`(() => {
+    const state = JSON.parse(localStorage.getItem('sudoku.game')).state;
+    return document.querySelectorAll('.cell-candidates > span.is-matching').length === state.candidates.filter(notes => notes.includes(4)).length;
+  })()`));
+  await click('#hint');
+  check('Hint changes candidates without leaving stale matching candidate highlights', await evaluate(`(() => {
+    const state = JSON.parse(localStorage.getItem('sudoku.game')).state;
+    return state.selectedCell === 36 && document.querySelectorAll('.cell-candidates > span.is-matching').length === state.candidates.filter(notes => notes.includes(4)).length;
+  })()`));
+  await reload();
+  check('Restored saved game redraws matching candidates from its selection', await evaluate(`(() => {
+    const state = JSON.parse(localStorage.getItem('sudoku.game')).state;
+    return state.selectedCell === 36 && document.querySelectorAll('.cell-candidates > span.is-matching').length === state.candidates.filter(notes => notes.includes(4)).length;
+  })()`));
+  await click('#restart');
   await click('#notes');
   for (const index of [6,29,10,11,3,40]) { await click(cell(index)); await key('7', 'Digit7'); }
   await click(cell(3)); await key('7', 'Digit7');

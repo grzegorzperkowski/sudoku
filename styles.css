@@ -12,6 +12,7 @@
   --given: #2c3730;
   --player: #377657;
   --accent: #385f48;
+  --candidate-match: #7a4d08;
   --accent-hover: #2d503b;
   --on-accent: #ffffff;
   --selected-cell: #c7ddc2;
@@ -42,6 +43,7 @@
   --given: #e4eadd;
   --player: #a5d1b0;
   --accent: #a3c6a0;
+  --candidate-match: #ffd17c;
   --accent-hover: #bddab9;
   --on-accent: #1b3021;
   --selected-cell: #486846;
@@ -106,6 +108,7 @@ h1 { font-family: Georgia, "Times New Roman", serif; font-size: 38px; font-weigh
 .cell-value { pointer-events: none; }
 .cell-candidates { position: absolute; inset: 4px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); pointer-events: none; font-size: 12px; }
 .cell-candidates > span { display: grid; place-items: center; color: var(--player); font-weight: 500; }
+.cell-candidates > span.is-matching { color: var(--candidate-match); font-weight: 800; }
 #notes[aria-pressed="true"] { background: var(--selected-cell); border-color: var(--accent); color: var(--accent); }
 .board-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
 .button { display: inline-flex; justify-content: center; align-items: center; gap: 8px; min-height: 41px; padding: 9px 14px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-bg); color: var(--text); font-size: 12px; font-weight: 600; }

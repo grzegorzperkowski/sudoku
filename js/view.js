@@ -58,6 +58,7 @@
       const column = index % 9;
       const selectedRow = selected === null ? -1 : Math.floor(selected / 9);
       const selectedColumn = selected === null ? -1 : selected % 9;
+      const selectedDigit = selected === null ? 0 : state.values[selected];
       const related = selected !== null && (row === selectedRow || column === selectedColumn ||
         (Math.floor(row / 3) === Math.floor(selectedRow / 3) && Math.floor(column / 3) === Math.floor(selectedColumn / 3)));
       const matching = selected !== null && digit !== 0 && digit === state.values[selected];
@@ -69,7 +70,11 @@
       value.textContent = digit || "";
       const notes = state.candidates[index];
       candidates.hidden = digit !== 0 || given || notes.length === 0;
-      candidateSlots.forEach((slot, position) => { slot.textContent = notes.includes(position + 1) ? position + 1 : ""; });
+      candidateSlots.forEach((slot, position) => {
+        const candidate = position + 1;
+        slot.textContent = notes.includes(candidate) ? candidate : "";
+        slot.classList.toggle("is-matching", selectedDigit !== 0 && candidate === selectedDigit && notes.includes(candidate));
+      });
       button.tabIndex = index === (selected === null ? 0 : selected) ? 0 : -1;
       button.setAttribute("aria-selected", String(selected === index));
       button.setAttribute("aria-readonly", String(given || state.status === "completed"));
