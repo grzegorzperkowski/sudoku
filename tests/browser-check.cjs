@@ -189,6 +189,13 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   await ready();
   check('New Game retains requested difficulty and generates a verified Extreme puzzle', await evaluate(`document.querySelector('#difficulty').value === 'Extreme' && document.querySelector('#puzzle-label').textContent === 'Extreme puzzle' && !document.querySelector('.is-selected') && Sudoku.analyzeDifficulty(JSON.parse(localStorage.getItem('sudoku.game')).state.givens).difficulty === 'Extreme'`));
   await legacyFixture({ difficulty: 'Extreme' });
+  const sevenState = await saved();
+  const sevenCells = sevenState.solution.map((digit, index) => digit === 7 && !sevenState.givens[index] ? index : -1).filter(index => index >= 0);
+  for (const index of sevenCells) { await click(cell(index)); await key('7', 'Digit7'); }
+  check('A digit button disappears after all nine placements and returns after an erase', await evaluate(`document.querySelector('[data-digit="7"]').hidden && !document.querySelector('[data-digit="7"]').getClientRects().length`));
+  await key('Delete');
+  check('Erasing a placed digit makes its keypad button visible again', await evaluate(`!document.querySelector('[data-digit="7"]').hidden && document.querySelector('[data-digit="7"]').getClientRects().length > 0`));
+  await click('#restart');
   await delay(1500);
   check('Timer advances while active', await evaluate(`document.querySelector('#timer').textContent !== '00:00:00'`));
   await click(cell(2)); await key('4', 'Digit4');

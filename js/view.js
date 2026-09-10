@@ -192,11 +192,17 @@
         Sudoku.isCellIncorrect(state, selected) ? "Incorrect entry. Try another number." : "Use the keypad or type a number.";
       // Avoid re-announcing unchanged live-region text on each timer tick.
       if (refs.selectionHelp.textContent !== help) refs.selectionHelp.textContent = help;
+      const digitCounts = state.values.reduce((counts, digit) => {
+        if (digit !== 0) counts[digit] += 1;
+        return counts;
+      }, Array(10).fill(0));
       refs.digits.forEach((button) => {
-        const isSelectedDigit = selected !== null && Number(button.dataset.digit) === state.values[selected];
-        button.disabled = !editable || (state.notesMode && state.values[selected] !== 0);
+        const digit = Number(button.dataset.digit);
+        const isSelectedDigit = selected !== null && digit === state.values[selected];
+        button.hidden = digitCounts[digit] >= 9;
+        button.disabled = button.hidden || !editable || (state.notesMode && state.values[selected] !== 0);
         button.classList.toggle("is-selected-digit", isSelectedDigit);
-        button.setAttribute("aria-label", `${state.notesMode ? "Toggle candidate" : "Enter"} ${button.dataset.digit}`);
+        button.setAttribute("aria-label", `${state.notesMode ? "Toggle candidate" : "Enter"} ${digit}`);
       });
       refs.erase.disabled = !editable || (state.values[selected] === 0 && state.candidates[selected].length === 0);
       refs.undo.disabled = busy || state.history.length === 0;
