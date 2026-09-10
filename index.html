@@ -60,7 +60,7 @@
           <p id="keyboard-help" class="keyboard-help"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> to move <span>·</span> <kbd>1–9</kbd> to enter <span>·</span> <kbd>Del</kbd> / <kbd>⌫</kbd> to erase</p>
         </section>
 
-        <aside class="control-panel" aria-label="Game controls">
+        <aside class="game-controls" aria-label="Game controls">
           <div class="difficulty-control">
             <label class="control-label" for="difficulty">Difficulty</label>
             <select id="difficulty" aria-describedby="difficulty-help">
@@ -69,6 +69,7 @@
             <p id="difficulty-help" class="helper-text">Choose a level for your next puzzle. Extreme takes longer to generate.</p>
           </div>
           <div class="panel-divider"></div>
+          <div class="control-panel">
           <div class="input-heading"><h2 id="input-heading">Place a number</h2><span id="selection-label">Select a cell</span></div>
           <div id="keypad" class="keypad" role="group" aria-label="Enter a number">
             <button type="button" data-digit="1" aria-label="Enter 1">1</button><button type="button" data-digit="2" aria-label="Enter 2">2</button><button type="button" data-digit="3" aria-label="Enter 3">3</button>
@@ -102,6 +103,7 @@
           <p id="generation-status" class="helper-text" role="status" hidden>Generating puzzle... This can take a while for Extreme.</p>
           <p id="generation-animation-name" class="generation-animation-name" aria-live="polite" hidden></p>
           <p id="generation-error" class="helper-text" role="alert" hidden>Could not find a verified puzzle in time. Please try New Game again.</p>
+          </div>
         </aside>
       </div>
     </main>

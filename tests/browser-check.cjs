@@ -345,7 +345,9 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   check('New Game clears persisted old puzzle history and candidates', (await saved()).history.length === 0 && (await saved()).future.length === 0 && (await saved()).candidates.every(digits=>digits.length===0));
   await legacyFixture({ difficulty: 'Hard', theme: 'dark' });
   await send('Emulation.setDeviceMetricsOverride', { width: 1366, height: 768, deviceScaleFactor: 1, mobile: false });
-  check('Board and game actions fit a 1366 by 768 desktop', await evaluate(`document.querySelector('#board').getBoundingClientRect().bottom <= innerHeight && document.querySelector('.game-actions').getBoundingClientRect().bottom <= innerHeight`));
+  const compactBounds = await evaluate(`(() => ({ board: document.querySelector('#board').getBoundingClientRect().toJSON(), actions: document.querySelector('.game-actions').getBoundingClientRect().toJSON(), innerHeight }))()`);
+  console.log('Compact layout bounds:', JSON.stringify(compactBounds));
+  check('Board and game actions fit a 1366 by 768 desktop', compactBounds.board.bottom <= compactBounds.innerHeight && compactBounds.actions.bottom <= compactBounds.innerHeight);
   await screenshot('compact.png');
   await click('#auto-candidates'); await screenshot('compact-candidates.png');
   const layout = await evaluate(`(() => { const selectors=['.app-header','.page-heading','#board','.control-panel','.app-footer']; return Object.fromEntries(selectors.map(s=>{const r=document.querySelector(s).getBoundingClientRect();return [s,{x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom}]})); })()`);
