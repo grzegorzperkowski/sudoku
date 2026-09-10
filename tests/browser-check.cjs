@@ -206,6 +206,7 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   await click(cell(2)); await click('#notes'); await key('1', 'Digit1'); await click('[data-digit="4"]'); await key('9', 'Digit9');
   assert.deepEqual(await candidatesAt(2), ['1','','','4','','','','','9']);
   check('Keyboard and keypad Notes share fixed 1–9 grid positions', await valueAt(2) === '' && await evaluate(`document.querySelector('#notes').getAttribute('aria-pressed') === 'true' && !document.querySelector('${cell(2)} .cell-candidates').hidden && document.querySelector('${cell(2)}').getAttribute('aria-label').includes('candidates 1, 4, 9')`));
+  check('Keypad highlights every candidate in the selected cell', await evaluate(`[1,4,9].every(digit => document.querySelector('[data-digit="' + digit + '"]').classList.contains('is-selected-digit')) && [2,3,5,6,7,8].every(digit => !document.querySelector('[data-digit="' + digit + '"]').classList.contains('is-selected-digit'))`));
   const positions = await evaluate(`Array.from(document.querySelector('${cell(2)} .cell-candidates').children).map(s=>{const r=s.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height};})`);
   check('Candidate mini-grid has three aligned rows and columns', positions[0].y === positions[2].y && positions[0].x === positions[6].x && positions[4].x > positions[3].x && positions[4].y > positions[1].y && positions[8].w > 8 && positions[8].h > 8);
   await screenshot('manual-notes.png');

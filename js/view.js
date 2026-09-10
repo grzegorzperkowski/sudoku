@@ -198,7 +198,8 @@
       }, Array(10).fill(0));
       refs.digits.forEach((button) => {
         const digit = Number(button.dataset.digit);
-        const isSelectedDigit = selected !== null && digit === state.values[selected];
+        const isSelectedDigit = selected !== null &&
+          (digit === state.values[selected] || state.candidates[selected].includes(digit));
         button.hidden = digitCounts[digit] >= 9;
         button.disabled = button.hidden || !editable || (state.notesMode && state.values[selected] !== 0);
         button.classList.toggle("is-selected-digit", isSelectedDigit);
