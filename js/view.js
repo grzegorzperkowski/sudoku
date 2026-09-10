@@ -5,6 +5,17 @@
     const find = (selector) => root.querySelector(selector);
     const board = find("#board");
     const cells = [];
+    const generationAnimations = Object.freeze([
+      { id: "ghost-grid", name: "Ghost grid", count: 48 },
+      { id: "box-build", name: "Box build", count: 36 },
+      { id: "number-rain", name: "Number rain", count: 30 },
+      { id: "solver-pulse", name: "Solver pulse", count: 20 }
+    ]);
+    let activeGenerationAnimation = null;
+    const generationOverlay = document.createElement("span");
+    generationOverlay.className = "generation-overlay";
+    generationOverlay.setAttribute("aria-hidden", "true");
+    generationOverlay.hidden = true;
     const refs = {
       timer: find("#timer"), status: find("#game-status"),
       theme: find("#theme"), difficulty: find("#difficulty"),
@@ -15,7 +26,7 @@
       undo: find("#undo"), redo: find("#redo"), notes: find("#notes"), autoCandidates: find("#auto-candidates"),
       inputHeading: find("#input-heading"), keypad: find("#keypad"), persistence: find("#persistence-status"),
       hint: find("#hint"), solve: find("#solve"), newGame: find("#new-game"), restart: find("#restart"),
-      puzzleLabel: find("#puzzle-label"), generation: find("#generation-status"), generationError: find("#generation-error"),
+      puzzleLabel: find("#puzzle-label"), generation: find("#generation-status"), generationAnimationName: find("#generation-animation-name"), generationError: find("#generation-error"),
       exportGame: find("#export-game"), importGame: find("#import-game"), importFile: find("#import-game-file"), fileStatus: find("#file-status")
     };
 
@@ -48,6 +59,76 @@
         cells.push({ button, value, candidates, candidateSlots });
       }
       board.append(rowElement);
+    }
+    // Keep this after the rows so row-based 3×3 box borders retain their
+    // actual child positions in the board grid.
+    board.append(generationOverlay);
+
+    function shuffledCells() {
+      const indexes = Array.from({ length: 81 }, (_, index) => index);
+      for (let index = indexes.length - 1; index > 0; index -= 1) {
+        const swap = Math.floor(Math.random() * (index + 1));
+        [indexes[index], indexes[swap]] = [indexes[swap], indexes[index]];
+      }
+      return indexes;
+    }
+
+    function addGenerationDigit(index, order, animation) {
+      const digit = document.createElement("span");
+      const row = Math.floor(index / 9);
+      const column = index % 9;
+      digit.className = "generation-digit";
+      digit.textContent = String(Math.floor(Math.random() * 9) + 1);
+      digit.style.left = `${(column + .5) / 9 * 100}%`;
+      digit.style.top = `${(row + .5) / 9 * 100}%`;
+      const duration = animation.id === "number-rain" ? 1.7 + Math.random() * 1.2 : 1.1 + Math.random() * 1.1;
+      digit.style.setProperty("--duration", `${duration}s`);
+      digit.style.setProperty("--delay", `${-(order * .13 + Math.random() * duration)}s`);
+      generationOverlay.append(digit);
+    }
+
+    function startGenerationAnimation() {
+      const animation = generationAnimations[Math.floor(Math.random() * generationAnimations.length)];
+      activeGenerationAnimation = animation;
+      generationOverlay.replaceChildren();
+      generationOverlay.className = `generation-overlay is-${animation.id}`;
+      generationOverlay.hidden = false;
+      refs.generationAnimationName.textContent = animation.name;
+      refs.generationAnimationName.hidden = false;
+
+      const cellsForAnimation = shuffledCells();
+      if (animation.id === "box-build") {
+        const boxes = Array.from({ length: 9 }, (_, box) => box).sort(() => Math.random() - .5);
+        boxes.forEach((box, boxOrder) => {
+          const boxRow = Math.floor(box / 3) * 3;
+          const boxColumn = box % 3 * 3;
+          for (let position = 0; position < 4; position += 1) {
+            const cell = (boxRow + Math.floor(Math.random() * 3)) * 9 + boxColumn + Math.floor(Math.random() * 3);
+            addGenerationDigit(cell, boxOrder * 4 + position, animation);
+          }
+        });
+      } else if (animation.id === "number-rain") {
+        cellsForAnimation.slice(0, animation.count).forEach((cell, order) => {
+          const digit = document.createElement("span");
+          digit.className = "generation-digit";
+          digit.textContent = String(Math.floor(Math.random() * 9) + 1);
+          digit.style.left = `${Math.random() * 100}%`;
+          digit.style.top = `${-15 + Math.random() * 25}%`;
+          digit.style.setProperty("--duration", `${1.7 + Math.random() * 1.2}s`);
+          digit.style.setProperty("--delay", `${-(order * .1 + Math.random() * 1.5)}s`);
+          generationOverlay.append(digit);
+        });
+      } else {
+        cellsForAnimation.slice(0, animation.count).forEach((cell, order) => addGenerationDigit(cell, order, animation));
+      }
+    }
+
+    function stopGenerationAnimation() {
+      activeGenerationAnimation = null;
+      generationOverlay.replaceChildren();
+      generationOverlay.hidden = true;
+      refs.generationAnimationName.textContent = "";
+      refs.generationAnimationName.hidden = true;
     }
 
     function renderCell(state, index) {
@@ -87,6 +168,7 @@
     function render(state) {
       const busy = state.generating;
       root.documentElement.dataset.theme = state.theme === "auto" ? state.systemTheme : state.theme;
+      root.documentElement.dataset.appReady = "true";
       refs.theme.value = state.theme;
       refs.difficulty.value = state.difficulty;
       refs.timer.textContent = Sudoku.formatElapsedTime(state.elapsedTime);
@@ -95,6 +177,9 @@
       refs.puzzleLabel.textContent = state.puzzleDifficulty ? `${state.puzzleDifficulty} puzzle` : "Sudoku";
       refs.generation.hidden = !busy;
       board.setAttribute("aria-busy", String(busy));
+      board.classList.toggle("is-generating", busy);
+      if (busy && activeGenerationAnimation === null) startGenerationAnimation();
+      if (!busy && activeGenerationAnimation !== null) stopGenerationAnimation();
       cells.forEach((cell, index) => renderCell(state, index));
       cells.forEach(cell => { cell.button.disabled = busy; });
 
@@ -142,6 +227,7 @@
       const completionText = `You completed the puzzle in ${Sudoku.formatElapsedTime(state.elapsedTime)}.`;
       if (complete && refs.completionMessage.textContent !== completionText) refs.completionMessage.textContent = completionText;
       refs.completion.hidden = !complete;
+      if (!complete) refs.completion.classList.remove("is-celebrating");
     }
 
     function focusCell(index) {
@@ -152,6 +238,16 @@
       refs.persistence.hidden = saved;
     }
 
+    function replayAnimation(element, className) {
+      element.classList.remove(className);
+      // Restart the CSS animation when a player begins another game.
+      void element.offsetWidth;
+      element.classList.add(className);
+    }
+
+    function playGameStartAnimation() { replayAnimation(board, "is-game-starting"); }
+    function playCompletionAnimation() { replayAnimation(refs.completion, "is-celebrating"); }
+
     function renderFileStatus(message, failed = false) {
       refs.fileStatus.textContent = message || "";
       refs.fileStatus.hidden = !message;
@@ -159,7 +255,7 @@
     }
 
     function renderGenerationError(failed) { refs.generationError.hidden = !failed; }
-    return { render, focusCell, renderPersistence, renderFileStatus, renderGenerationError };
+    return { render, focusCell, playGameStartAnimation, playCompletionAnimation, renderPersistence, renderFileStatus, renderGenerationError };
   }
 
   Sudoku.createGameView = createGameView;

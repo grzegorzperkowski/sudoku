@@ -1,6 +1,13 @@
 (function (Sudoku) {
   "use strict";
   const CELLS = Array.from({ length: 81 }, (_, cell) => cell);
+  const BANDS = [0, 1, 2];
+  // A verified Extreme seed. Its positions are randomized using only Sudoku
+  // automorphisms that preserve the logical engine's complete technique path.
+  // Digit relabeling is deliberately excluded because technique tie-breaking
+  // can change the measured rating even when the puzzle is isomorphic.
+  const EXTREME_SEED_GIVENS = Array.from("005640208000005970000009000502000000000000000060080104810500000040200007003006800", Number);
+  const EXTREME_SEED_SOLUTION = Array.from("195647238634825971728319465582461793471953682369782154817594326946238517253176849", Number);
   function seededRandom(seed) {
     let value = seed >>> 0;
     return () => {
@@ -21,17 +28,45 @@
     return exact.count === 1 && exact.solution.every((value, cell) => value === puzzle.solution[cell]) &&
       analysis.solved && analysis.board.every((value, cell) => value === puzzle.solution[cell]) && analysis.difficulty === puzzle.difficulty;
   }
+  function shuffledBands(random) {
+    return Sudoku.shuffled(BANDS, random).flatMap(band => Sudoku.shuffled([band * 3, band * 3 + 1, band * 3 + 2], random));
+  }
+  function transformExtremeSeed(random) {
+    const rows = shuffledBands(random);
+    const columns = shuffledBands(random);
+    const transposed = random() < .5;
+    const transform = board => {
+      const output = Array(81);
+      for (let row = 0; row < 9; row++) {
+        for (let column = 0; column < 9; column++) {
+          const source = transposed ? columns[column] * 9 + rows[row] : rows[row] * 9 + columns[column];
+          output[row * 9 + column] = board[source];
+        }
+      }
+      return output;
+    };
+    const givens = transform(EXTREME_SEED_GIVENS);
+    const solution = transform(EXTREME_SEED_SOLUTION);
+    const analysis = Sudoku.analyzeDifficulty(givens);
+    const puzzle = { givens, solution, difficulty: "Extreme", puzzleDifficulty: "Extreme", analysis, generationAttempts: 1 };
+    if (!validateGeneratedPuzzle(puzzle)) throw new Error("Extreme seed transformation failed validation.");
+    return puzzle;
+  }
   // The iterator makes identical work available to synchronous tests and to the
   // browser's time-sliced driver. It never returns an easier fallback.
   function* createPuzzleSearch(difficulty, { random = Math.random, maxAttempts = Infinity } = {}) {
     if (!Object.keys(Sudoku.DIFFICULTY_RULES).includes(difficulty)) throw new RangeError("Unknown difficulty.");
+    if (difficulty === "Extreme") {
+      if (!(maxAttempts >= 1)) throw new Error(`No ${difficulty} puzzle found within the configured search budget.`);
+      // Preserve a browser turn for the generation state and cancellation API.
+      yield { attempt: 1, clues: EXTREME_SEED_GIVENS.filter(Boolean).length };
+      return transformExtremeSeed(random);
+    }
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const solution = Sudoku.solveExact(Array(81).fill(0), { random, limit: 1 }).solution;
       let givens = solution.slice();
       const promising = [];
-      // Extreme explores fresh clue layouts near dynamically discovered difficult
-      // candidates. Every outer attempt still starts from a new random full grid.
-      const rounds = difficulty === "Extreme" ? 32 : 1;
+      const rounds = 1;
       for (let round = 0; round < rounds; round++) {
         let clues = givens.filter(Boolean).length;
         yield { attempt, clues };
@@ -81,15 +116,25 @@
   async function generatePuzzle(difficulty, options = {}) {
     const search = createPuzzleSearch(difficulty, options);
     const now = () => globalThis.performance ? globalThis.performance.now() : Date.now();
-    let deadline = now();
+    const maxElapsedMilliseconds = options.maxElapsedMilliseconds === undefined ? Infinity : options.maxElapsedMilliseconds;
+    if (maxElapsedMilliseconds !== Infinity && (!Number.isFinite(maxElapsedMilliseconds) || maxElapsedMilliseconds < 0)) {
+      throw new RangeError("Generation time budget must be a non-negative number.");
+    }
+    const timeoutAt = now() + maxElapsedMilliseconds;
+    let yieldAt = now();
     while (true) {
       if (options.signal && options.signal.aborted) throw new Error("Generation cancelled.");
+      if (now() >= timeoutAt) throw new Error("Generation timed out.");
       const result = search.next();
-      if (result.done) return result.value;
-      if (now() >= deadline) {
+      if (result.done) {
+        if (now() >= timeoutAt) throw new Error("Generation timed out.");
+        return result.value;
+      }
+      if (now() >= timeoutAt) throw new Error("Generation timed out.");
+      if (now() >= yieldAt) {
         if (options.onProgress) options.onProgress(result.value);
         await new Promise(resolve => setTimeout(resolve, 0));
-        deadline = now() + 12;
+        yieldAt = now() + 12;
       }
     }
   }

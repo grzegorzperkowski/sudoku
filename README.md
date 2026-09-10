@@ -10,7 +10,7 @@ Use **Save to file** to download a shareable JSON snapshot of the current game, 
 
 Choose **Easy, Normal, Hard, Expert, or Extreme**, then **New Game**. Each new puzzle is generated dynamically, checked for exactly one solution, and solved entirely by the logical engine before it is accepted. Changing the selector chooses the next game's level; the label above the board continues to show the current puzzle's actual rating. New Game asks before abandoning unfinished progress. Restart retains its immediate Phase 2 behavior and resets the current puzzle.
 
-Generation displays **Generating puzzle...**, disables conflicting game controls and keyboard edits, and periodically yields to the browser. Appearance controls remain usable. Extreme can take considerably longer than the other levels; the generator keeps searching instead of returning an easier puzzle. The old game stays recoverable until a validated replacement is ready. Refresh during generation restores that saved game, or starts fresh generation if there was no previous game. A generation failure leaves the old game intact and offers New Game again.
+Generation displays **Generating puzzle...** and its board animation for at least 1.5 seconds on every difficulty, disabling conflicting game controls and keyboard edits during the transition. Appearance controls remain usable. Extreme boards are constructed immediately from a verified seed using randomized Sudoku-preserving row, column, band, stack, and transpose transformations. The 15-second limit remains as a guard; it should not be reached during normal generation. The generator never returns an easier fallback: a failure leaves the old game intact and offers New Game again. Refresh during generation restores that saved game, or starts fresh generation if there was no previous game.
 
 ### Notes and history
 
@@ -115,20 +115,19 @@ The final rules were then checked with **10 independently seeded generations per
 | Normal | 80–138 | 98.2 | 1–5 | 0 | 3–12 | 23–35 |
 | Hard | 184–259 | 209.1 | 8–13 | 0 | 17–29 | 22–26 |
 | Expert | 351–398 | 372.2 | 1–8 | 2–3 | 11–25 | 22–26 |
-| Extreme | 713–948 | 782.3 | 5–17 | 5–8 | 25–54 | 22–26 |
+| Extreme | 742 | 742.0 | 11 | 5 | 41 | 24 |
 
-Extreme averaged **2.10× Expert's score** and required 67–79 total logical steps. Its paths included XY-Wing, X-Wing, Swordfish, and/or Simple Coloring in addition to intermediate work. The full calibration can be reproduced with `node tests/calibrate.cjs`; it prints ten samples per level as JSON. Exact wall-clock times depend on hardware and browser scheduling. The initial synchronous Extreme sample took roughly 3–44 seconds per puzzle; cooperative browser generation can take longer, including minutes. There is no fixed production time limit or easier fallback.
+Extreme averages **2.0× Expert's score** and requires 73 total logical steps. Its path includes XY-Wing and Simple Coloring in addition to intermediate work. The full calibration can be reproduced with `node tests/calibrate.cjs`; it prints ten samples per level as JSON. Extreme construction is normally near-instant; exact wall-clock times still depend on hardware and browser scheduling. The 15-second UI guard remains in place, and there is no easier fallback.
 
 ## Generation algorithm
 
-1. Create a fresh randomized valid completed grid using exact search.
+1. For Easy through Expert, create a fresh randomized valid completed grid using exact search.
 2. Shuffle clue-removal order. Tentatively remove each clue and restore it unless solution counting proves there is exactly one solution.
-3. For Easy and Normal, analyze productive intermediate carving positions; for higher levels, analyze the carved puzzle.
-4. Run the full deterministic logical solver and acceptance rules. Reject stuck puzzles and incorrect profiles.
-5. For Extreme, explore up to 32 nearby clue layouts around dynamically discovered promising positions. Retain up to four high-effort candidates, add back three to five solution clues, and carve again in a fresh random order. This is a search optimization, not a source of ratings. Unsolved candidates may guide exploration but can never be returned.
-6. If nothing qualifies, start with another independently randomized solved grid. Before returning a puzzle, independently validate its givens, completed solution, uniqueness, logical completion, and requested class again.
+3. Run the full deterministic logical solver and acceptance rules. Reject stuck puzzles and incorrect profiles.
+4. For Extreme, transform one independently verified Extreme seed by randomly reordering row bands and rows within each band, column stacks and columns within each stack, and optionally transposing the board. These 3,359,232 transformations provide millions of positional variations while preserving its unique solution and the engine's Extreme technique path; digit relabeling is excluded because it changes the engine's deterministic tie-breaking.
+5. Before returning a puzzle, independently validate its givens, completed solution, uniqueness, logical completion, and requested class again.
 
-No fixed puzzle database supplies gameplay. The legacy puzzle and fixed advanced boards appear only in regression tests. `seededRandom(seed)` provides repeatability for tests; production uses `Math.random`. The synchronous and asynchronous APIs drive the same search iterator. The browser driver targets 12 ms work slices and yields with `setTimeout`; an individual exact/logical operation can exceed that budget. It uses no worker, module-loader, or server assumptions. The optional API `signal` supports cancellation; an optional `maxAttempts` is for bounded callers/tests and throws if exhausted.
+No puzzle database supplies the Easy-through-Expert gameplay. Extreme uses one verified seed pattern with 3,359,232 randomized positional transformations, providing millions of layout variations while retaining its verified solution and difficulty. `seededRandom(seed)` provides repeatability for tests; production uses `Math.random`. The synchronous and asynchronous APIs drive the same search iterator. The browser driver targets 12 ms work slices and yields with `setTimeout`; an individual exact/logical operation can exceed that budget. It uses no worker, module-loader, or server assumptions. The optional API `signal` supports cancellation; optional `maxAttempts` and asynchronous `maxElapsedMilliseconds` budgets throw if exhausted. The app applies a 15-second `maxElapsedMilliseconds` budget only to interactive Extreme generation.
 
 ## Persistence and compatibility
 
@@ -170,4 +169,4 @@ The Chrome runner uses the existing installed browser and built-in Node faciliti
 
 ## Practical limits
 
-Difficulty is calibrated against the implemented logical solver, not a universal human rating standard. Some unique puzzles need techniques this engine does not implement; they are rejected for rated generation. Extreme has variable generation time and no guarantee of a fixed latency. Browser scheduling can extend the wait. These limits do not relax uniqueness, logical solvability, or the Extreme acceptance criteria.
+Difficulty is calibrated against the implemented logical solver, not a universal human rating standard. Some unique puzzles need techniques this engine does not implement; they are rejected for rated generation. Extreme uses a randomized transformation of its verified seed and normally generates immediately; the 15-second interactive limit protects against unexpected runtime failures. Browser scheduling can extend the wait slightly because an individual exact/logical operation cannot be interrupted. These limits do not relax uniqueness, logical solvability, or the Extreme acceptance criteria.

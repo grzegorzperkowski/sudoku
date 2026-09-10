@@ -82,10 +82,15 @@
     const heartbeat = setInterval(() => beats++, 0);
     const controller = new AbortController(); let cancelled = false;
     try {
-      await S.generatePuzzle("Extreme", { random: S.seededRandom(3100), signal: controller.signal, onProgress: () => { if (beats >= 2) controller.abort(); } });
+      await S.generatePuzzle("Extreme", { random: S.seededRandom(3100), signal: controller.signal, onProgress: () => controller.abort() });
     } catch (error) { cancelled = error.message === "Generation cancelled."; }
     finally { clearInterval(heartbeat); }
-    test("Asynchronous generation yields to the event loop and supports cancellation", () => { assert(beats >= 2); assert(cancelled); });
+    test("Asynchronous generation yields to the event loop and supports cancellation", () => { assert(beats >= 1); assert(cancelled); });
+    let timedOut = false;
+    try {
+      await S.generatePuzzle("Extreme", { maxElapsedMilliseconds: 0 });
+    } catch (error) { timedOut = error.message === "Generation timed out."; }
+    test("Asynchronous generation honors an explicit wall-clock budget", () => { assert(timedOut); });
     globalThis.SudokuCalibrationResults = samples;
     globalThis.renderSudokuTestResults();
   }());

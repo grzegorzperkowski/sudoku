@@ -10,6 +10,11 @@
   const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
   let timerId = null;
   let lastSavedSecond = -1;
+  // Extreme's strict acceptance rules can make an unlucky search run for a
+  // very long time. Bound only the interactive request; a timeout keeps the
+  // current game playable and never substitutes an easier puzzle.
+  const EXTREME_GENERATION_TIME_BUDGET_MS = 10_000;
+  const MIN_GENERATION_DISPLAY_MS = 1_100;
 
   // Scheduling and browser objects stay outside the serializable game state.
   function syncTimer(state) {
@@ -67,6 +72,8 @@
   store.subscribe((state, previous, action) => {
     view.render(state);
     syncTimer(state);
+    if (action.type === "START_GAME" || action.type === "RESTART_GAME") view.playGameStartAnimation();
+    if (state.status === "completed" && previous.status !== "completed" && action.type !== "LOAD_SAVED_STATE") view.playCompletionAnimation();
     // Save all meaningful transitions, with timer-only writes capped at once
     // per second. Capture precise milliseconds again at lifecycle boundaries.
     if (action.type !== "TICK" || Math.floor(state.elapsedTime / 1000) !== lastSavedSecond) saveGame();
@@ -83,10 +90,15 @@
     if (state.status === "active" && hasProgress && !window.confirm("Abandon this unfinished puzzle and start a new game?")) return;
     actions.setGenerating(true);
     view.renderGenerationError(false);
+    const minimumDisplay = new Promise(resolve => window.setTimeout(resolve, MIN_GENERATION_DISPLAY_MS));
     try {
-      const puzzle = await Sudoku.generatePuzzle(state.difficulty);
+      const puzzle = await Sudoku.generatePuzzle(state.difficulty, state.difficulty === "Extreme" ? {
+        maxElapsedMilliseconds: EXTREME_GENERATION_TIME_BUDGET_MS
+      } : undefined);
+      await minimumDisplay;
       actions.startGame(puzzle);
     } catch (error) {
+      await minimumDisplay;
       actions.setGenerating(false);
       view.renderGenerationError(true);
     }
@@ -179,6 +191,7 @@
   if (!restoredState) startNewGame();
   else {
     view.render(store.getState());
+    view.playGameStartAnimation();
     syncTimer(store.getState());
     saveGame();
   }

@@ -135,8 +135,9 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   }
   await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: initialSave.identifier });
   check('9 rows and 81 cells render from file URL', await evaluate(`document.querySelectorAll('[role="row"]').length === 9 && document.querySelectorAll('[role="gridcell"]').length === 81`));
+  check('Restored game plays the board entrance animation', await evaluate(`document.querySelector('#board').classList.contains('is-game-starting')`));
   check('30 givens and a square board', await evaluate(`document.querySelectorAll('.is-given').length === 30 && (() => {const r=document.querySelector('#board').getBoundingClientRect();return r.width===r.height;})()`));
-  check('Thick box boundaries and thin internal boundaries', await evaluate(`getComputedStyle(document.querySelector('[data-cell="2"]')).borderRightWidth === '2px' && getComputedStyle(document.querySelector('[data-cell="1"]')).borderRightWidth === '1px'`));
+  check('Thick box boundaries and thin internal boundaries', await evaluate(`getComputedStyle(document.querySelector('[data-cell="2"]')).borderRightWidth === '2px' && getComputedStyle(document.querySelector('[data-cell="1"]')).borderRightWidth === '1px' && getComputedStyle(document.querySelector('[data-cell="18"]')).borderBottomWidth === '2px' && getComputedStyle(document.querySelector('[data-cell="9"]')).borderBottomWidth === '1px'`));
   await screenshot('light.png');
   await click(cell(0));
   check('Mouse selection and grid focus', (await selected()) === 0 && await evaluate(`document.activeElement.dataset.cell === '0'`));
@@ -322,7 +323,7 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   await delay(1050);
   const solution = '534678912672195348198342567859761423426853791713924856961537284287419635345286179';
   await evaluate(`(() => { const solution=${JSON.stringify(solution)}; for (let i=0;i<81;i++){ const el=document.querySelector('[data-cell="'+i+'"]'); if (!el.classList.contains('is-given')) { el.click(); el.dispatchEvent(new KeyboardEvent('keydown',{key:solution[i],bubbles:true})); } } })()`);
-  check('Completion shown with final time', await evaluate(`document.querySelector('#game-status').textContent === 'Completed' && !document.querySelector('#completion').hidden && document.querySelector('#completion-message').textContent.includes(document.querySelector('#timer').textContent)`));
+  check('Completion shown with final time and celebration animation', await evaluate(`document.querySelector('#game-status').textContent === 'Completed' && !document.querySelector('#completion').hidden && document.querySelector('#completion').classList.contains('is-celebrating') && document.querySelector('#completion-message').textContent.includes(document.querySelector('#timer').textContent)`));
   const finalTime = await evaluate(`document.querySelector('#timer').textContent`);
   await delay(1200);
   check('Timer remains stopped on completion', await evaluate(`document.querySelector('#timer').textContent`) === finalTime);
@@ -372,7 +373,7 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
     if (old.puzzleDifficulty) check('Selecting ' + difficulty + ' preserves the active puzzle rating', await evaluate(`document.querySelector('#puzzle-label').textContent`) === old.puzzleDifficulty + ' puzzle');
     await click('#new-game');
     if (difficulty === 'Extreme') {
-      check('Extreme shows generation progress and disables conflicting controls', await evaluate(`document.querySelector('#board').getAttribute('aria-busy') === 'true' && !document.querySelector('#generation-status').hidden && ['new-game','restart','hint','solve','notes','auto-candidates','undo','redo','difficulty'].every(id => document.getElementById(id).disabled)`));
+      check('Extreme shows a named generation animation and disables conflicting controls', await evaluate(`document.querySelector('#board').getAttribute('aria-busy') === 'true' && document.querySelector('#board').classList.contains('is-generating') && !document.querySelector('#generation-status').hidden && !document.querySelector('#generation-animation-name').hidden && document.querySelectorAll('.generation-overlay .generation-digit').length > 0 && ['new-game','restart','hint','solve','notes','auto-candidates','undo','redo','difficulty'].every(id => document.getElementById(id).disabled)`));
       await evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key:'1', bubbles:true }));`);
       assert.deepEqual(gameplay(await saved()), gameplay(old));
       await select('#theme', 'light');
