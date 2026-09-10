@@ -2,6 +2,8 @@
 
 A desktop Sudoku application made with HTML, CSS, and vanilla JavaScript. Open `index.html` directly in Chrome or another modern desktop browser. Everything runs offline: no dependencies, installation, build step, server, external resources, or network requests. Classic scripts work from `file://`.
 
+When the game is hosted over HTTPS (or `localhost` during development), its service worker stores the complete app shell after the first successful load. Later visits work without an internet connection. The `file://` version remains directly playable without a service worker.
+
 ## Playing
 
 Click a cell, move with the arrow keys, and enter digits using the keyboard or keypad. Delete, Backspace, and Erase clear editable cells. Givens are protected. Incorrect entries are checked against the verified solution; correct completion stops the timer and shows the existing completion message.

@@ -187,6 +187,17 @@
   window.addEventListener("pagehide", saveGame);
   window.addEventListener("pageshow", () => { actions.tick(); });
 
+  // A service worker gives hosted copies of the game an offline app shell
+  // after the first successful visit. file:// already loads these local files
+  // directly and cannot register a service worker, so it is left untouched.
+  if ((window.location.protocol === "http:" || window.location.protocol === "https:") &&
+      window.isSecureContext && "serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./service-worker.js").catch(() => {
+      // Offline caching is optional: gameplay must still work if a host
+      // forbids service workers or the browser has them disabled.
+    });
+  }
+
   actions.setSystemTheme(systemTheme.matches ? "dark" : "light");
   if (!restoredState) startNewGame();
   else {
