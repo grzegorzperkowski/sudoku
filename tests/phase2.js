@@ -254,6 +254,28 @@
     const before = restored.getState(); restored.captureState(); equal(restored.getState(), before);
   });
 
+  test("Portable game files preserve full state, validate on import, and resume from the imported time", () => {
+    const { store, advance } = newGame("Expert"); const harness = storageHarness();
+    note(store, 2, 1, 4); place(store, 3, 6); store.actions.undo(); store.actions.setTheme("dark"); advance(12345);
+    const captured = store.captureState();
+    const file = harness.persistence.exportGame(captured);
+    const envelope = JSON.parse(file);
+    equal(envelope.format, Sudoku.EXPORT_FORMAT); equal(envelope.schemaVersion, Sudoku.SCHEMA_VERSION);
+    equal(envelope.exportedAt, 100000); assert(!Object.hasOwn(envelope.state, "systemTheme"));
+    const imported = harness.persistence.importGame(file);
+    sameData(imported, Sudoku.validateSavedState(captured));
+    ["", "{}", JSON.stringify({ ...envelope, format: "other" }), JSON.stringify({ ...envelope, state: {} })].forEach(raw => throws(() => harness.persistence.importGame(raw)));
+
+    let clock = 20;
+    const receivingStore = Sudoku.createGameStore({ now: () => clock });
+    receivingStore.actions.startGame(Sudoku.getDevelopmentPuzzle());
+    receivingStore.actions.setSystemTheme("dark");
+    receivingStore.actions.loadState(imported);
+    equal(receivingStore.getState().systemTheme, "dark"); equal(receivingStore.getState().elapsedTime, captured.elapsedTime);
+    clock += 1000; receivingStore.actions.tick(); equal(receivingStore.getState().elapsedTime, captured.elapsedTime + 1000);
+    const beforeInvalidLoad = receivingStore.getState(); throws(() => receivingStore.actions.loadState({})); equal(receivingStore.getState(), beforeInvalidLoad);
+  });
+
   test("Completed game saves freeze time across closure and retain undoable completion", () => {
     const { store, puzzle, advance } = newGame(); const harness = storageHarness();
     const givens = puzzle.solution.slice(); givens[0] = 0;

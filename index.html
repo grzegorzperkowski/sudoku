@@ -87,6 +87,14 @@
             <button id="solve" type="button" class="button" disabled title="Reveal the solution after confirmation">Solve</button>
           </div>
           <div class="panel-divider"></div>
+          <div class="tools-heading"><h2>Save or share</h2></div>
+          <div class="file-actions" aria-label="Game file controls">
+            <button id="export-game" type="button" class="button">Save to file</button>
+            <button id="import-game" type="button" class="button">Load from file</button>
+            <input id="import-game-file" type="file" accept="application/json,.json" hidden>
+          </div>
+          <p id="file-status" class="file-status" role="status" aria-live="polite" hidden></p>
+          <div class="panel-divider"></div>
           <div class="game-actions">
             <button id="new-game" type="button" class="button button-primary">New Game <span aria-hidden="true">↗</span></button>
             <button id="restart" type="button" class="button restart-button"><span aria-hidden="true">↻</span> Restart</button>

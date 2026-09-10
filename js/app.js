@@ -29,6 +29,41 @@
     lastSavedSecond = Math.floor(state.elapsedTime / 1000);
   }
 
+  function exportGame() {
+    const state = store.captureState();
+    if (state.generating || state.status === "idle") return;
+    try {
+      const file = new Blob([persistence.exportGame(state)], { type: "application/json" });
+      const link = document.createElement("a");
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      link.href = URL.createObjectURL(file);
+      link.download = `sudoku-game-${timestamp}.json`;
+      link.hidden = true;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(link.href), 0);
+      view.renderFileStatus("Game saved to a shareable file.");
+    } catch (error) {
+      view.renderFileStatus("Could not save this game file.", true);
+    }
+  }
+
+  async function importGame(event) {
+    const file = event.target.files[0];
+    event.target.value = ""; // Allow selecting the same file again after an error.
+    if (!file || store.getState().generating) return;
+    try {
+      const importedState = persistence.importGame(await file.text());
+      if (store.getState().status !== "idle" && !window.confirm("Load this saved game? Your current game will be replaced.")) return;
+      actions.loadState(importedState);
+      focusSelection();
+      view.renderFileStatus("Game loaded from file.");
+    } catch (error) {
+      view.renderFileStatus("Could not load that file. Choose a valid Sudoku game file.", true);
+    }
+  }
+
   store.subscribe((state, previous, action) => {
     view.render(state);
     syncTimer(state);
@@ -120,6 +155,13 @@
     });
   });
   document.querySelector("#new-game").addEventListener("click", startNewGame);
+  document.querySelector("#export-game").addEventListener("click", exportGame);
+  document.querySelector("#import-game").addEventListener("click", () => {
+    const fileInput = document.querySelector("#import-game-file");
+    fileInput.value = "";
+    fileInput.click();
+  });
+  document.querySelector("#import-game-file").addEventListener("change", importGame);
   document.querySelector("#solve").addEventListener("click", () => {
     if (store.getState().status === "active" && !store.getState().generating && window.confirm("Reveal the complete solution?")) actions.solve(true);
   });

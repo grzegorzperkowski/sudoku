@@ -140,6 +140,7 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   await screenshot('light.png');
   await click(cell(0));
   check('Mouse selection and grid focus', (await selected()) === 0 && await evaluate(`document.activeElement.dataset.cell === '0'`));
+  check('Keypad highlights the selected given digit', await evaluate(`document.querySelector('[data-digit="5"]').classList.contains('is-selected-digit') && !document.querySelector('[data-digit="4"]').classList.contains('is-selected-digit')`));
   check('Row, column, box, matching highlights', await evaluate(`[1,9,10].every(i=>document.querySelector('[data-cell="'+i+'"]').classList.contains('is-related')) && document.querySelectorAll('.is-matching').length === 3 && !document.querySelector('[data-cell="40"]').classList.contains('is-related')`));
   await key('4', 'Digit4');
   await key('Delete');
@@ -153,6 +154,7 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   check('Arrow keys stop at bottom-right edge', await selected() === 80);
   await click(cell(2)); await key('1', 'Digit1');
   check('Wrong keyboard entry is retained and marked', await valueAt(2) === '1' && await evaluate(`document.querySelector('${cell(2)}').getAttribute('aria-invalid') === 'true'`));
+  check('Keypad highlights the selected player digit', await evaluate(`document.querySelector('[data-digit="1"]').classList.contains('is-selected-digit') && !document.querySelector('[data-digit="5"]').classList.contains('is-selected-digit')`));
   check('Selected error retains selection shading', await evaluate(`getComputedStyle(document.querySelector('${cell(2)}')).backgroundColor === 'rgb(199, 221, 194)'`));
   await key('4', 'Digit4');
   check('Replacement corrects error without clearing first', await valueAt(2) === '4' && await evaluate(`!document.querySelector('${cell(2)}').classList.contains('is-incorrect')`));

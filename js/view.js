@@ -15,7 +15,8 @@
       undo: find("#undo"), redo: find("#redo"), notes: find("#notes"), autoCandidates: find("#auto-candidates"),
       inputHeading: find("#input-heading"), keypad: find("#keypad"), persistence: find("#persistence-status"),
       hint: find("#hint"), solve: find("#solve"), newGame: find("#new-game"), restart: find("#restart"),
-      puzzleLabel: find("#puzzle-label"), generation: find("#generation-status"), generationError: find("#generation-error")
+      puzzleLabel: find("#puzzle-label"), generation: find("#generation-status"), generationError: find("#generation-error"),
+      exportGame: find("#export-game"), importGame: find("#import-game"), importFile: find("#import-game-file"), fileStatus: find("#file-status")
     };
 
     for (let row = 0; row < 9; row += 1) {
@@ -107,7 +108,9 @@
       // Avoid re-announcing unchanged live-region text on each timer tick.
       if (refs.selectionHelp.textContent !== help) refs.selectionHelp.textContent = help;
       refs.digits.forEach((button) => {
+        const isSelectedDigit = selected !== null && Number(button.dataset.digit) === state.values[selected];
         button.disabled = !editable || (state.notesMode && state.values[selected] !== 0);
+        button.classList.toggle("is-selected-digit", isSelectedDigit);
         button.setAttribute("aria-label", `${state.notesMode ? "Toggle candidate" : "Enter"} ${button.dataset.digit}`);
       });
       refs.erase.disabled = !editable || (state.values[selected] === 0 && state.candidates[selected].length === 0);
@@ -120,6 +123,9 @@
       refs.solve.disabled = busy || state.status !== "active";
       refs.newGame.disabled = busy;
       refs.restart.disabled = busy || state.status === "idle";
+      refs.exportGame.disabled = busy || state.status === "idle";
+      refs.importGame.disabled = busy;
+      refs.importFile.disabled = busy;
       refs.difficulty.disabled = busy;
       refs.inputHeading.textContent = state.notesMode ? "Pencil in notes" : "Place a number";
       refs.keypad.setAttribute("aria-label", state.notesMode ? "Toggle a candidate" : "Enter a number");
@@ -146,8 +152,14 @@
       refs.persistence.hidden = saved;
     }
 
+    function renderFileStatus(message, failed = false) {
+      refs.fileStatus.textContent = message || "";
+      refs.fileStatus.hidden = !message;
+      refs.fileStatus.classList.toggle("is-error", Boolean(failed));
+    }
+
     function renderGenerationError(failed) { refs.generationError.hidden = !failed; }
-    return { render, focusCell, renderPersistence, renderGenerationError };
+    return { render, focusCell, renderPersistence, renderFileStatus, renderGenerationError };
   }
 
   Sudoku.createGameView = createGameView;

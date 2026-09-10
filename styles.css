@@ -145,12 +145,17 @@ kbd { font-family: inherit; font-size: 10px; min-width: 17px; padding: 3px 4px; 
 .keypad button:hover:enabled { background: var(--same-number); border-color: var(--accent); }
 .keypad button:active:enabled { background: var(--selected-cell); }
 .keypad button:disabled { color: var(--disabled-text); background: var(--disabled-bg); }
+.keypad button.is-selected-digit { background: var(--selected-cell); border-color: var(--accent); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .erase-button { margin-top: 10px; width: 100%; }
 .erase-button span { font-size: 19px; font-weight: 400; }
 .selection-help { min-height: 15px; margin: 9px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.5; }
 .coming-label { font-size: 8px; letter-spacing: 1px; color: var(--text-faint); }
 .future-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .future-controls .button { font-size: 11px; padding: 8px 4px; }
+.file-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.file-actions .button { padding: 8px 4px; font-size: 11px; }
+.file-status { min-height: 15px; margin: 9px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.5; }
+.file-status.is-error { color: var(--error-text); }
 .button-primary { width: 100%; background: var(--accent); color: var(--on-accent); border-color: var(--accent); min-height: 44px; justify-content: space-between; padding-left: 17px; padding-right: 17px; }
 .button-primary:hover:enabled { background: var(--accent-hover); }
 .button-primary span { font-size: 19px; }

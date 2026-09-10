@@ -186,6 +186,9 @@
         return typeof action.generating !== "boolean" || action.generating === state.generating ? state : { ...state, generating: action.generating };
       case "START_GAME":
         return startPuzzle(state, action.puzzleData);
+      case "LOAD_SAVED_STATE":
+        // Shared files never carry the recipient's detected system theme.
+        return { ...Sudoku.validateSavedState(action.savedState), systemTheme: state.systemTheme };
       case "RESTART_GAME":
         return state.status === "idle" ? state : startPuzzle(state, state);
       case "SELECT_CELL":
@@ -312,6 +315,8 @@
 
       if (action.type === "START_GAME" || action.type === "RESTART_GAME") {
         startedAt = nextState.status === "active" ? readClock() : null;
+      } else if (action.type === "LOAD_SAVED_STATE") {
+        startedAt = nextState.status === "active" ? readClock() - nextState.elapsedTime : null;
       } else {
         nextState = { ...nextState, elapsedTime: action.elapsedTime };
         if (nextState.status !== "active") startedAt = null;
@@ -336,6 +341,7 @@
       },
       actions: Object.freeze({
         startGame: puzzleData => dispatch({ type: "START_GAME", puzzleData }),
+        loadState: savedState => dispatch({ type: "LOAD_SAVED_STATE", savedState }),
         setGenerating: generating => dispatch({ type: "SET_GENERATING", generating }),
         restartGame: () => dispatch({ type: "RESTART_GAME" }),
         selectCell: index => dispatch({ type: "SELECT_CELL", index }),
