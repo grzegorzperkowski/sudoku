@@ -6,8 +6,28 @@
   const store = Sudoku.createGameStore({ initialState: restoredState });
   const view = Sudoku.createGameView(document);
   const { actions } = store;
-  const board = document.querySelector("#board");
+  const elements = Object.freeze({
+    board: document.querySelector("#board"),
+    keypad: document.querySelector("#keypad"),
+    erase: document.querySelector("#erase"),
+    undo: document.querySelector("#undo"),
+    redo: document.querySelector("#redo"),
+    notes: document.querySelector("#notes"),
+    autoCandidates: document.querySelector("#auto-candidates"),
+    hint: document.querySelector("#hint"),
+    solve: document.querySelector("#solve"),
+    restart: document.querySelector("#restart"),
+    newGame: document.querySelector("#new-game"),
+    exportGame: document.querySelector("#export-game"),
+    importGame: document.querySelector("#import-game"),
+    importFile: document.querySelector("#import-game-file"),
+    difficulty: document.querySelector("#difficulty"),
+    theme: document.querySelector("#theme")
+  });
   const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+  const KEYBOARD_DIRECTIONS = Object.freeze({
+    ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1]
+  });
   let timerId = null;
   let lastSavedSecond = -1;
   // Extreme's strict acceptance rules can make an unlucky search run for a
@@ -49,7 +69,7 @@
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(link.href), 0);
       view.renderFileStatus("Game saved to a shareable file.");
-    } catch (error) {
+    } catch {
       view.renderFileStatus("Could not save this game file.", true);
     }
   }
@@ -64,7 +84,7 @@
       actions.loadState(importedState);
       focusSelection();
       view.renderFileStatus("Game loaded from file.");
-    } catch (error) {
+    } catch {
       view.renderFileStatus("Could not load that file. Choose a valid Sudoku game file.", true);
     }
   }
@@ -86,7 +106,7 @@
   async function startNewGame() {
     const state = store.getState();
     if (state.generating) return;
-    const hasProgress = state.values.some((value, cell) => value !== state.givens[cell]) || state.candidates.some(digits => digits.length) || state.history.length || state.future.length;
+    const hasProgress = gameHasProgress(state);
     if (state.status === "active" && hasProgress && !window.confirm("Abandon this unfinished puzzle and start a new game?")) return;
     actions.setGenerating(true);
     view.renderGenerationError(false);
@@ -97,26 +117,30 @@
       } : undefined);
       await minimumDisplay;
       actions.startGame(puzzle);
-    } catch (error) {
+    } catch {
       await minimumDisplay;
       actions.setGenerating(false);
       view.renderGenerationError(true);
     }
   }
 
-  board.addEventListener("click", (event) => {
+  function gameHasProgress(state) {
+    return state.values.some((value, cell) => value !== state.givens[cell]) ||
+      state.candidates.some(digits => digits.length > 0) || state.history.length > 0 || state.future.length > 0;
+  }
+
+  function selectBoardCell(event, focus = true) {
     const cell = event.target.closest("[data-cell]");
-    if (!cell) return;
+    if (!cell || !elements.board.contains(cell)) return;
     actions.selectCell(Number(cell.dataset.cell));
-    focusSelection();
-  });
+    if (focus) focusSelection();
+  }
 
-  board.addEventListener("focusin", (event) => {
-    const cell = event.target.closest("[data-cell]");
-    if (cell) actions.selectCell(Number(cell.dataset.cell));
-  });
+  function handleBoardFocus(event) {
+    selectBoardCell(event, false);
+  }
 
-  document.addEventListener("keydown", (event) => {
+  function handleKeyboardInput(event) {
     if (store.getState().generating) return;
     if (event.altKey || event.isComposing || event.defaultPrevented) return;
     // Let native form controls and focused toolbar buttons retain their keys.
@@ -134,11 +158,10 @@
       }
       return;
     }
-    if (event.target.closest("button, a") && !board.contains(event.target)) return;
-    const directions = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
-    if (directions[event.key]) {
+    if (event.target.closest("button, a") && !elements.board.contains(event.target)) return;
+    if (KEYBOARD_DIRECTIONS[event.key]) {
       event.preventDefault();
-      actions.moveSelection(...directions[event.key]);
+      actions.moveSelection(...KEYBOARD_DIRECTIONS[event.key]);
       focusSelection();
     } else if (/^[1-9]$/.test(event.key)) {
       event.preventDefault();
@@ -147,45 +170,65 @@
       event.preventDefault();
       actions.clearCell();
     }
-  });
+  }
 
-  document.querySelector("#keypad").addEventListener("click", (event) => {
+  function handleKeypadClick(event) {
     const button = event.target.closest("[data-digit]");
     if (!button || button.disabled) return;
     actions.inputDigit(Number(button.dataset.digit));
     focusSelection();
-  });
-  document.querySelector("#erase").addEventListener("click", () => {
+  }
+
+  function eraseSelectedCell() {
     actions.clearCell();
     focusSelection();
-  });
-  document.querySelector("#restart").addEventListener("click", actions.restartGame);
-  [["#undo", actions.undo], ["#redo", actions.redo], ["#notes", actions.toggleNotesMode], ["#auto-candidates", actions.autoCandidates], ["#hint", actions.hint]].forEach(([selector, action]) => {
-    document.querySelector(selector).addEventListener("click", () => {
+  }
+
+  function openImportDialog() {
+    elements.importFile.value = "";
+    elements.importFile.click();
+  }
+
+  function confirmSolve() {
+    if (store.getState().status === "active" && !store.getState().generating && window.confirm("Reveal the complete solution?")) actions.solve(true);
+  }
+
+  function dispatchAndFocus(action) {
+    return () => {
       action();
       focusSelection();
-    });
-  });
-  document.querySelector("#new-game").addEventListener("click", startNewGame);
-  document.querySelector("#export-game").addEventListener("click", exportGame);
-  document.querySelector("#import-game").addEventListener("click", () => {
-    const fileInput = document.querySelector("#import-game-file");
-    fileInput.value = "";
-    fileInput.click();
-  });
-  document.querySelector("#import-game-file").addEventListener("change", importGame);
-  document.querySelector("#solve").addEventListener("click", () => {
-    if (store.getState().status === "active" && !store.getState().generating && window.confirm("Reveal the complete solution?")) actions.solve(true);
-  });
-  document.querySelector("#difficulty").addEventListener("change", (event) => actions.setDifficulty(event.target.value));
-  document.querySelector("#theme").addEventListener("change", (event) => actions.setTheme(event.target.value));
-  systemTheme.addEventListener("change", (event) => actions.setSystemTheme(event.matches ? "dark" : "light"));
-  document.addEventListener("visibilitychange", () => {
+    };
+  }
+
+  function saveOnVisibilityChange() {
     actions.tick();
     saveGame();
-  });
-  window.addEventListener("pagehide", saveGame);
-  window.addEventListener("pageshow", () => { actions.tick(); });
+  }
+
+  function bindEventListeners() {
+    elements.board.addEventListener("click", selectBoardCell);
+    elements.board.addEventListener("focusin", handleBoardFocus);
+    document.addEventListener("keydown", handleKeyboardInput);
+    elements.keypad.addEventListener("click", handleKeypadClick);
+    elements.erase.addEventListener("click", eraseSelectedCell);
+    elements.restart.addEventListener("click", actions.restartGame);
+    [[elements.undo, actions.undo], [elements.redo, actions.redo], [elements.notes, actions.toggleNotesMode],
+      [elements.autoCandidates, actions.autoCandidates], [elements.hint, actions.hint]]
+      .forEach(([element, action]) => element.addEventListener("click", dispatchAndFocus(action)));
+    elements.newGame.addEventListener("click", startNewGame);
+    elements.exportGame.addEventListener("click", exportGame);
+    elements.importGame.addEventListener("click", openImportDialog);
+    elements.importFile.addEventListener("change", importGame);
+    elements.solve.addEventListener("click", confirmSolve);
+    elements.difficulty.addEventListener("change", (event) => actions.setDifficulty(event.target.value));
+    elements.theme.addEventListener("change", (event) => actions.setTheme(event.target.value));
+    systemTheme.addEventListener("change", (event) => actions.setSystemTheme(event.matches ? "dark" : "light"));
+    document.addEventListener("visibilitychange", saveOnVisibilityChange);
+    window.addEventListener("pagehide", saveGame);
+    window.addEventListener("pageshow", actions.tick);
+  }
+
+  bindEventListeners();
 
   // A service worker gives hosted copies of the game an offline app shell
   // after the first successful visit. file:// already loads these local files

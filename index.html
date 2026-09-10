@@ -28,7 +28,7 @@
       </a>
       <div class="theme-control">
         <label for="theme">Appearance</label>
-        <select id="theme" aria-label="Color theme">
+        <select id="theme">
           <option value="auto">Auto</option>
           <option value="light">Light</option>
           <option value="dark">Dark</option>
@@ -37,27 +37,46 @@
     </header>
 
     <main>
-      <div class="page-heading">
-        <div><p class="eyebrow">A LITTLE SPACE TO THINK</p><h1>Find your focus.</h1><p class="intro">One grid. Nine numbers. Your own pace.</p></div>
-        <span class="offline-label"><span aria-hidden="true"></span>Made to play offline</span>
-      </div>
+      <header class="page-heading">
+        <div class="page-introduction">
+          <p class="eyebrow">A LITTLE SPACE TO THINK</p>
+          <h1>Find your focus.</h1>
+          <p class="intro">One grid. Nine numbers. Your own pace.</p>
+        </div>
+        <p class="offline-label"><span aria-hidden="true"></span>Made to play offline</p>
+      </header>
 
       <div class="workspace">
         <section class="board-section" aria-label="Sudoku game">
-          <div class="board-heading">
-            <div><span id="puzzle-label" class="puzzle-label">Sudoku</span><span id="game-status" class="game-status">Generating puzzle...</span></div>
-            <div class="timer-block"><span class="timer-label">TIME</span><time id="timer" role="timer" aria-label="Elapsed time">00:00:00</time></div>
-          </div>
+          <header class="board-heading">
+            <div class="puzzle-summary">
+              <p id="puzzle-label" class="puzzle-label">Sudoku</p>
+              <p id="game-status" class="game-status">Generating puzzle...</p>
+            </div>
+            <div class="timer-block">
+              <span class="timer-label">TIME</span>
+              <time id="timer">00:00:00</time>
+            </div>
+          </header>
           <div id="board" class="board" role="grid" aria-label="Sudoku puzzle" aria-rowcount="9" aria-colcount="9" aria-describedby="keyboard-help"></div>
-          <div class="board-footer">
-            <div class="history-controls" aria-label="History controls">
+          <footer class="board-footer">
+            <div class="history-controls" role="group" aria-label="History controls">
               <button id="undo" type="button" class="button button-quiet" disabled title="Undo (Ctrl+Z)"><span aria-hidden="true">↶</span> Undo</button>
               <button id="redo" type="button" class="button button-quiet" disabled title="Redo (Ctrl+Y or Ctrl+Shift+Z)"><span aria-hidden="true">↷</span> Redo</button>
             </div>
-            <div class="progress-block"><span id="filled-count">30 <span>/ 81 filled</span></span><div id="progress" class="progress-track" role="progressbar" aria-label="Cells filled" aria-valuemin="0" aria-valuemax="81" aria-valuenow="30"><span id="progress-fill"></span></div></div>
-          </div>
-          <div id="completion" class="completion" role="status" aria-live="polite" hidden><span class="completion-mark" aria-hidden="true">✓</span><div><h2>Beautifully done.</h2><p id="completion-message"></p></div></div>
-          <p id="keyboard-help" class="keyboard-help"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> to move <span>·</span> <kbd>1–9</kbd> to enter <span>·</span> <kbd>Del</kbd> / <kbd>⌫</kbd> to erase</p>
+            <div class="progress-block">
+              <output id="filled-count">30 <span>/ 81 filled</span></output>
+              <progress id="progress" class="progress-track" aria-label="Cells filled" max="81" value="30"></progress>
+            </div>
+          </footer>
+          <section id="completion" class="completion" hidden>
+            <span class="completion-mark" aria-hidden="true">✓</span>
+            <div>
+              <h2>Beautifully done.</h2>
+              <p id="completion-message"></p>
+            </div>
+          </section>
+          <p id="keyboard-help" class="keyboard-help"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> to move · <kbd>1–9</kbd> to enter · <kbd>Del</kbd> / <kbd>⌫</kbd> to erase</p>
         </section>
 
         <aside class="game-controls" aria-label="Game controls">
@@ -68,48 +87,59 @@
             </select>
             <p id="difficulty-help" class="helper-text">Choose a level for your next puzzle. Extreme takes longer to generate.</p>
           </div>
-          <div class="panel-divider"></div>
+          <div class="panel-divider" aria-hidden="true"></div>
           <div class="control-panel">
-          <div class="input-heading"><h2 id="input-heading">Place a number</h2><span id="selection-label">Select a cell</span></div>
-          <div id="keypad" class="keypad" role="group" aria-label="Enter a number">
-            <button type="button" data-digit="1" aria-label="Enter 1">1</button><button type="button" data-digit="2" aria-label="Enter 2">2</button><button type="button" data-digit="3" aria-label="Enter 3">3</button>
-            <button type="button" data-digit="4" aria-label="Enter 4">4</button><button type="button" data-digit="5" aria-label="Enter 5">5</button><button type="button" data-digit="6" aria-label="Enter 6">6</button>
-            <button type="button" data-digit="7" aria-label="Enter 7">7</button><button type="button" data-digit="8" aria-label="Enter 8">8</button><button type="button" data-digit="9" aria-label="Enter 9">9</button>
-          </div>
-          <button id="erase" type="button" class="button erase-button"><span aria-hidden="true">⌫</span> Erase</button>
-          <p id="selection-help" class="selection-help" aria-live="polite">Choose any empty cell to begin.</p>
-          <div class="panel-divider"></div>
-          <div class="tools-heading"><h2>Assistance</h2></div>
-          <div class="future-controls" aria-label="Assistance controls">
-            <button id="notes" type="button" class="button" aria-pressed="false" title="Toggle candidate Notes mode">Notes</button>
-            <button id="auto-candidates" type="button" class="button" title="Replace notes with all directly legal candidates">Auto Candidates</button>
-            <button id="hint" type="button" class="button" disabled title="Reveal one correct digit">Hint</button>
-            <button id="solve" type="button" class="button" disabled title="Reveal the solution after confirmation">Solve</button>
-          </div>
-          <div class="panel-divider"></div>
-          <div class="tools-heading"><h2>Save or share</h2></div>
-          <div class="file-actions" aria-label="Game file controls">
-            <button id="export-game" type="button" class="button">Save to file</button>
-            <button id="import-game" type="button" class="button">Load from file</button>
-            <input id="import-game-file" type="file" accept="application/json,.json" hidden>
-          </div>
-          <p id="file-status" class="file-status" role="status" aria-live="polite" hidden></p>
-          <div class="panel-divider"></div>
-          <div class="game-actions">
-            <button id="new-game" type="button" class="button button-primary">New Game <span aria-hidden="true">↗</span></button>
-            <button id="restart" type="button" class="button restart-button"><span aria-hidden="true">↻</span> Restart</button>
-          </div>
-          <p id="persistence-status" class="helper-text" role="status" hidden>Browser storage is unavailable or full. Your progress cannot be saved.</p>
-          <p id="generation-status" class="helper-text" role="status" hidden>Generating puzzle... This can take a while for Extreme.</p>
-          <p id="generation-animation-name" class="generation-animation-name" aria-live="polite" hidden></p>
-          <p id="generation-error" class="helper-text" role="alert" hidden>Could not find a verified puzzle in time. Please try New Game again.</p>
+            <section aria-labelledby="input-heading">
+              <header class="input-heading">
+                <h2 id="input-heading">Place a number</h2>
+                <p id="selection-label">Select a cell</p>
+              </header>
+              <div id="keypad" class="keypad" role="group" aria-label="Enter a number">
+                <button type="button" data-digit="1" aria-label="Enter 1">1</button><button type="button" data-digit="2" aria-label="Enter 2">2</button><button type="button" data-digit="3" aria-label="Enter 3">3</button>
+                <button type="button" data-digit="4" aria-label="Enter 4">4</button><button type="button" data-digit="5" aria-label="Enter 5">5</button><button type="button" data-digit="6" aria-label="Enter 6">6</button>
+                <button type="button" data-digit="7" aria-label="Enter 7">7</button><button type="button" data-digit="8" aria-label="Enter 8">8</button><button type="button" data-digit="9" aria-label="Enter 9">9</button>
+              </div>
+              <button id="erase" type="button" class="button erase-button"><span aria-hidden="true">⌫</span> Erase</button>
+              <p id="selection-help" class="selection-help" aria-live="polite">Choose any empty cell to begin.</p>
+            </section>
+            <div class="panel-divider" aria-hidden="true"></div>
+            <section aria-labelledby="assistance-heading">
+              <header class="tools-heading"><h2 id="assistance-heading">Assistance</h2></header>
+              <div class="future-controls">
+                <button id="notes" type="button" class="button" aria-pressed="false" title="Toggle candidate Notes mode">Notes</button>
+                <button id="auto-candidates" type="button" class="button" title="Replace notes with all directly legal candidates">Auto Candidates</button>
+                <button id="hint" type="button" class="button" disabled title="Reveal one correct digit">Hint</button>
+                <button id="solve" type="button" class="button" disabled title="Reveal the solution after confirmation">Solve</button>
+              </div>
+            </section>
+            <div class="panel-divider" aria-hidden="true"></div>
+            <section aria-labelledby="file-actions-heading">
+              <header class="tools-heading"><h2 id="file-actions-heading">Save or share</h2></header>
+              <div class="file-actions">
+                <button id="export-game" type="button" class="button">Save to file</button>
+                <button id="import-game" type="button" class="button">Load from file</button>
+                <label for="import-game-file" class="visually-hidden">Choose a saved Sudoku game file</label>
+                <input id="import-game-file" type="file" accept="application/json,.json" hidden>
+              </div>
+              <p id="file-status" class="file-status" hidden></p>
+            </section>
+            <div class="panel-divider" aria-hidden="true"></div>
+            <div class="game-actions">
+              <button id="new-game" type="button" class="button button-primary">New Game <span aria-hidden="true">↗</span></button>
+              <button id="restart" type="button" class="button restart-button"><span aria-hidden="true">↻</span> Restart</button>
+            </div>
+            <p id="persistence-status" class="helper-text" hidden>Browser storage is unavailable or full. Your progress cannot be saved.</p>
+            <p id="generation-status" class="helper-text" hidden>Generating puzzle... This can take a while for Extreme.</p>
+            <p id="generation-animation-name" class="generation-animation-name" hidden></p>
+            <p id="generation-error" class="helper-text" hidden>Could not find a verified puzzle in time. Please try New Game again.</p>
           </div>
         </aside>
       </div>
     </main>
-    <footer class="app-footer"><span>Every number has its place.</span></footer>
+    <footer class="app-footer"><p>Every number has its place.</p></footer>
   </div>
+  <p id="live-announcements" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
   <noscript><p class="noscript">Please enable JavaScript to play this offline Sudoku game.</p></noscript>
-  <script data-goatcounter="https://gperkowski.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+  <script data-goatcounter="https://gperkowski.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </body>
 </html>

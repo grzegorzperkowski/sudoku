@@ -4,6 +4,8 @@
   function createGameView(root) {
     const find = (selector) => root.querySelector(selector);
     const board = find("#board");
+    const BOARD_SIZE = 9;
+    const CELL_COUNT = BOARD_SIZE * BOARD_SIZE;
     const cells = [];
     const generationAnimations = Object.freeze([
       { id: "ghost-grid", name: "Ghost grid", count: 48 },
@@ -12,7 +14,10 @@
       { id: "solver-pulse", name: "Solver pulse", count: 20 }
     ]);
     let activeGenerationAnimation = null;
-    const generationOverlay = document.createElement("span");
+    let wasGenerating = false;
+    let wasComplete = false;
+    let persistenceWasAvailable = true;
+    const generationOverlay = root.createElement("span");
     generationOverlay.className = "generation-overlay";
     generationOverlay.setAttribute("aria-hidden", "true");
     generationOverlay.hidden = true;
@@ -21,36 +26,37 @@
       theme: find("#theme"), difficulty: find("#difficulty"),
       selection: find("#selection-label"), selectionHelp: find("#selection-help"),
       erase: find("#erase"), digits: [...root.querySelectorAll("[data-digit]")],
-      filled: find("#filled-count"), progress: find("#progress"), progressFill: find("#progress-fill"),
+      filled: find("#filled-count"), progress: find("#progress"),
       completion: find("#completion"), completionMessage: find("#completion-message"),
       undo: find("#undo"), redo: find("#redo"), notes: find("#notes"), autoCandidates: find("#auto-candidates"),
       inputHeading: find("#input-heading"), keypad: find("#keypad"), persistence: find("#persistence-status"),
       hint: find("#hint"), solve: find("#solve"), newGame: find("#new-game"), restart: find("#restart"),
       puzzleLabel: find("#puzzle-label"), generation: find("#generation-status"), generationAnimationName: find("#generation-animation-name"), generationError: find("#generation-error"),
-      exportGame: find("#export-game"), importGame: find("#import-game"), importFile: find("#import-game-file"), fileStatus: find("#file-status")
+      exportGame: find("#export-game"), importGame: find("#import-game"), importFile: find("#import-game-file"),
+      fileStatus: find("#file-status"), announcements: find("#live-announcements")
     };
 
-    for (let row = 0; row < 9; row += 1) {
-      const rowElement = document.createElement("div");
+    for (let row = 0; row < BOARD_SIZE; row += 1) {
+      const rowElement = root.createElement("div");
       rowElement.className = "board-row";
       rowElement.setAttribute("role", "row");
       rowElement.setAttribute("aria-rowindex", row + 1);
-      for (let column = 0; column < 9; column += 1) {
-        const button = document.createElement("button");
+      for (let column = 0; column < BOARD_SIZE; column += 1) {
+        const button = root.createElement("button");
         button.type = "button";
         button.className = "cell";
-        button.dataset.cell = row * 9 + column;
+        button.dataset.cell = row * BOARD_SIZE + column;
         button.setAttribute("role", "gridcell");
         button.setAttribute("aria-colindex", column + 1);
-        const value = document.createElement("span");
+        const value = root.createElement("span");
         value.className = "cell-value";
         value.setAttribute("aria-hidden", "true");
-        const candidates = document.createElement("span");
+        const candidates = root.createElement("span");
         candidates.className = "cell-candidates";
         candidates.setAttribute("aria-hidden", "true");
         candidates.hidden = true;
-        const candidateSlots = Array.from({ length: 9 }, () => {
-          const slot = document.createElement("span");
+        const candidateSlots = Array.from({ length: BOARD_SIZE }, () => {
+          const slot = root.createElement("span");
           candidates.append(slot);
           return slot;
         });
@@ -65,7 +71,7 @@
     board.append(generationOverlay);
 
     function shuffledCells() {
-      const indexes = Array.from({ length: 81 }, (_, index) => index);
+      const indexes = Array.from({ length: CELL_COUNT }, (_, index) => index);
       for (let index = indexes.length - 1; index > 0; index -= 1) {
         const swap = Math.floor(Math.random() * (index + 1));
         [indexes[index], indexes[swap]] = [indexes[swap], indexes[index]];
@@ -74,13 +80,13 @@
     }
 
     function addGenerationDigit(index, order, animation) {
-      const digit = document.createElement("span");
-      const row = Math.floor(index / 9);
-      const column = index % 9;
+      const digit = root.createElement("span");
+      const row = Math.floor(index / BOARD_SIZE);
+      const column = index % BOARD_SIZE;
       digit.className = "generation-digit";
       digit.textContent = String(Math.floor(Math.random() * 9) + 1);
-      digit.style.left = `${(column + .5) / 9 * 100}%`;
-      digit.style.top = `${(row + .5) / 9 * 100}%`;
+      digit.style.left = `${(column + .5) / BOARD_SIZE * 100}%`;
+      digit.style.top = `${(row + .5) / BOARD_SIZE * 100}%`;
       const duration = animation.id === "number-rain" ? 1.7 + Math.random() * 1.2 : 1.1 + Math.random() * 1.1;
       digit.style.setProperty("--duration", `${duration}s`);
       digit.style.setProperty("--delay", `${-(order * .13 + Math.random() * duration)}s`);
@@ -103,13 +109,13 @@
           const boxRow = Math.floor(box / 3) * 3;
           const boxColumn = box % 3 * 3;
           for (let position = 0; position < 4; position += 1) {
-            const cell = (boxRow + Math.floor(Math.random() * 3)) * 9 + boxColumn + Math.floor(Math.random() * 3);
+            const cell = (boxRow + Math.floor(Math.random() * 3)) * BOARD_SIZE + boxColumn + Math.floor(Math.random() * 3);
             addGenerationDigit(cell, boxOrder * 4 + position, animation);
           }
         });
       } else if (animation.id === "number-rain") {
         cellsForAnimation.slice(0, animation.count).forEach((cell, order) => {
-          const digit = document.createElement("span");
+          const digit = root.createElement("span");
           digit.className = "generation-digit";
           digit.textContent = String(Math.floor(Math.random() * 9) + 1);
           digit.style.left = `${Math.random() * 100}%`;
@@ -131,15 +137,19 @@
       refs.generationAnimationName.hidden = true;
     }
 
+    function announce(message) {
+      if (message && refs.announcements.textContent !== message) refs.announcements.textContent = message;
+    }
+
     function renderCell(state, index) {
       const { button, value, candidates, candidateSlots } = cells[index];
       const digit = state.values[index];
       const given = state.givens[index] !== 0;
       const selected = state.selectedCell;
-      const row = Math.floor(index / 9);
-      const column = index % 9;
-      const selectedRow = selected === null ? -1 : Math.floor(selected / 9);
-      const selectedColumn = selected === null ? -1 : selected % 9;
+      const row = Math.floor(index / BOARD_SIZE);
+      const column = index % BOARD_SIZE;
+      const selectedRow = selected === null ? -1 : Math.floor(selected / BOARD_SIZE);
+      const selectedColumn = selected === null ? -1 : selected % BOARD_SIZE;
       const selectedDigit = selected === null ? 0 : state.values[selected];
       const related = selected !== null && (row === selectedRow || column === selectedColumn ||
         (Math.floor(row / 3) === Math.floor(selectedRow / 3) && Math.floor(column / 3) === Math.floor(selectedColumn / 3)));
@@ -178,6 +188,7 @@
       refs.generation.hidden = !busy;
       board.setAttribute("aria-busy", String(busy));
       board.classList.toggle("is-generating", busy);
+      if (busy && !wasGenerating) announce("Generating puzzle.");
       if (busy && activeGenerationAnimation === null) startGenerationAnimation();
       if (!busy && activeGenerationAnimation !== null) stopGenerationAnimation();
       cells.forEach((cell, index) => renderCell(state, index));
@@ -185,7 +196,7 @@
 
       const selected = state.selectedCell;
       const editable = !busy && selected !== null && state.givens[selected] === 0 && state.status === "active";
-      refs.selection.textContent = selected === null ? "Select a cell" : `R${Math.floor(selected / 9) + 1} · C${selected % 9 + 1}`;
+      refs.selection.textContent = selected === null ? "Select a cell" : `R${Math.floor(selected / BOARD_SIZE) + 1} · C${selected % BOARD_SIZE + 1}`;
       const help = state.status === "completed" ? "Puzzle complete. Ready for another?" :
         selected === null ? "Choose any empty cell to begin." : state.givens[selected] ? "This is a given and cannot be changed." :
         state.notesMode ? (state.values[selected] ? "Erase this value before adding notes." : "Type or click a digit to toggle its note.") :
@@ -223,18 +234,20 @@
       refs.keypad.setAttribute("aria-label", state.notesMode ? "Toggle a candidate" : "Enter a number");
 
       const filled = state.values.filter(Boolean).length;
-      refs.filled.replaceChildren(document.createTextNode(`${filled} `));
-      const totalLabel = document.createElement("span");
+      refs.filled.replaceChildren(root.createTextNode(`${filled} `));
+      const totalLabel = root.createElement("span");
       totalLabel.textContent = "/ 81 filled";
       refs.filled.append(totalLabel);
-      refs.progress.setAttribute("aria-valuenow", filled);
-      refs.progressFill.style.width = `${filled / 81 * 100}%`;
+      refs.progress.value = filled;
 
       const complete = state.status === "completed";
       const completionText = `You completed the puzzle in ${Sudoku.formatElapsedTime(state.elapsedTime)}.`;
       if (complete && refs.completionMessage.textContent !== completionText) refs.completionMessage.textContent = completionText;
+      if (complete && !wasComplete) announce(completionText);
       refs.completion.hidden = !complete;
       if (!complete) refs.completion.classList.remove("is-celebrating");
+      wasGenerating = busy;
+      wasComplete = complete;
     }
 
     function focusCell(index) {
@@ -243,6 +256,8 @@
 
     function renderPersistence(saved) {
       refs.persistence.hidden = saved;
+      if (!saved && persistenceWasAvailable) announce(refs.persistence.textContent);
+      persistenceWasAvailable = saved;
     }
 
     function replayAnimation(element, className) {
@@ -259,9 +274,13 @@
       refs.fileStatus.textContent = message || "";
       refs.fileStatus.hidden = !message;
       refs.fileStatus.classList.toggle("is-error", Boolean(failed));
+      announce(message);
     }
 
-    function renderGenerationError(failed) { refs.generationError.hidden = !failed; }
+    function renderGenerationError(failed) {
+      refs.generationError.hidden = !failed;
+      if (failed) announce(refs.generationError.textContent);
+    }
     return { render, focusCell, playGameStartAnimation, playCompletionAnimation, renderPersistence, renderFileStatus, renderGenerationError };
   }
 
