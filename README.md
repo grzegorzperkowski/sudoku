@@ -2,7 +2,7 @@
 
 A desktop Sudoku application made with HTML, CSS, and vanilla JavaScript. Open `index.html` directly in Chrome or another modern desktop browser. Everything runs offline: no dependencies, installation, build step, server, external resources, or network requests. Classic scripts work from `file://`.
 
-When the game is hosted over HTTPS (or `localhost` during development), its service worker stores the complete app shell after the first successful load. Later visits work without an internet connection. The `file://` version remains directly playable without a service worker.
+When the game is hosted over HTTPS (or `localhost` during development), its service worker uses a network-first strategy: it fetches a fresh same-origin app shell on every visit and caches successful responses. After one successful online load, later visits fall back to that cached shell when offline, when the network takes longer than three seconds, or when the server has a temporary failure. The `file://` version remains directly playable without a service worker.
 
 ## Playing
 
