@@ -22,7 +22,7 @@
     importGame: document.querySelector("#import-game"),
     importFile: document.querySelector("#import-game-file"),
     difficulty: document.querySelector("#difficulty"),
-    theme: document.querySelector("#theme")
+    themeToggle: document.querySelector("#theme-toggle")
   });
   const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
   const KEYBOARD_DIRECTIONS = Object.freeze({
@@ -221,7 +221,11 @@
     elements.importFile.addEventListener("change", importGame);
     elements.solve.addEventListener("click", confirmSolve);
     elements.difficulty.addEventListener("change", (event) => actions.setDifficulty(event.target.value));
-    elements.theme.addEventListener("change", (event) => actions.setTheme(event.target.value));
+    elements.themeToggle.addEventListener("click", () => {
+      const state = store.getState();
+      const resolvedTheme = state.theme === "auto" ? state.systemTheme : state.theme;
+      actions.setTheme(resolvedTheme === "dark" ? "light" : "dark");
+    });
     systemTheme.addEventListener("change", (event) => actions.setSystemTheme(event.matches ? "dark" : "light"));
     document.addEventListener("visibilitychange", saveOnVisibilityChange);
     window.addEventListener("pagehide", saveGame);

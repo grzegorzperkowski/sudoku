@@ -23,7 +23,7 @@
     generationOverlay.hidden = true;
     const refs = {
       timer: find("#timer"), status: find("#game-status"),
-      theme: find("#theme"), difficulty: find("#difficulty"),
+      themeToggle: find("#theme-toggle"), difficulty: find("#difficulty"),
       selection: find("#selection-label"), selectionHelp: find("#selection-help"),
       erase: find("#erase"), digits: [...root.querySelectorAll("[data-digit]")],
       filled: find("#filled-count"), progress: find("#progress"),
@@ -177,9 +177,12 @@
 
     function render(state) {
       const busy = state.generating;
-      root.documentElement.dataset.theme = state.theme === "auto" ? state.systemTheme : state.theme;
+      const resolvedTheme = state.theme === "auto" ? state.systemTheme : state.theme;
+      const nextTheme = resolvedTheme === "dark" ? "light" : "dark";
+      root.documentElement.dataset.theme = resolvedTheme;
       root.documentElement.dataset.appReady = "true";
-      refs.theme.value = state.theme;
+      refs.themeToggle.setAttribute("aria-checked", String(resolvedTheme === "dark"));
+      refs.themeToggle.title = `Switch to ${nextTheme} theme`;
       refs.difficulty.value = state.difficulty;
       refs.timer.textContent = Sudoku.formatElapsedTime(state.elapsedTime);
       refs.timer.dateTime = `PT${Math.floor(state.elapsedTime / 1000)}S`;

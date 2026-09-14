@@ -80,6 +80,18 @@ async function key(key, code = key, modifiers = 0) {
 async function select(selector, value) {
   await evaluate(`(() => { const el = document.querySelector(${JSON.stringify(selector)}); el.value = ${JSON.stringify(value)}; el.dispatchEvent(new Event('change', {bubbles:true})); })()`);
 }
+async function setTheme(theme) {
+  const current = await saved();
+  const resolved = await evaluate(`document.documentElement.dataset.theme`);
+  if (current.theme === theme) return;
+  if (resolved === theme) await click('#theme-toggle');
+  await click('#theme-toggle');
+}
+async function restoreAutoTheme() {
+  const injection = await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {const e=JSON.parse(localStorage.getItem('sudoku.game'));e.state.theme='auto';localStorage.setItem('sudoku.game',JSON.stringify(e));})()` });
+  await reload();
+  await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: injection.identifier });
+}
 const cell = index => `[data-cell="${index}"]`;
 const valueAt = index => evaluate(`document.querySelector('${cell(index)} .cell-value').textContent`);
 const selected = () => evaluate(`Number(document.querySelector('.is-selected').dataset.cell)`);
@@ -168,15 +180,15 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   await click('#erase');
   check('Erase clears a player value', await valueAt(2) === '');
   check('Phase 2 controls and implemented Hint/Solve are enabled', await evaluate(`['hint','solve','undo','notes','auto-candidates'].every(id=>!document.getElementById(id).disabled) && document.querySelector('#redo').disabled`));
-  await select('#theme', 'dark');
-  check('Manual Dark applies', await evaluate(`document.documentElement.dataset.theme === 'dark'`));
+  await setTheme('dark');
+  check('Theme switch applies Manual Dark and exposes its state', await evaluate(`document.documentElement.dataset.theme === 'dark' && document.querySelector('#theme-toggle').getAttribute('aria-checked') === 'true' && document.querySelector('#theme-toggle').title === 'Switch to light theme'`));
   await screenshot('dark.png');
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });
   await delay(50);
   check('Manual Dark overrides system Light', await evaluate(`document.documentElement.dataset.theme === 'dark'`));
-  await select('#theme', 'light');
+  await setTheme('light');
   check('Manual Light applies', await evaluate(`document.documentElement.dataset.theme === 'light'`));
-  await select('#theme', 'auto');
+  await restoreAutoTheme();
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
   await delay(50);
   check('Auto follows a live system change to Dark', await evaluate(`document.documentElement.dataset.theme === 'dark'`));
@@ -248,7 +260,7 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
       highlights.every(slot => slot.textContent === '4') &&
       !slots.some(slot => slot.textContent === '7' && slot.classList.contains('is-matching'));
   })()`));
-  await select('#theme', 'dark');
+  await setTheme('dark');
   check('Candidate 4 emphasis keeps bold, distinct contrast in Dark theme', await evaluate(`(() => {
     const highlighted = document.querySelector('${cell(2)} .cell-candidates').children[3];
     const plain = document.querySelector('${cell(2)} .cell-candidates').children[1];
@@ -256,7 +268,7 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
       getComputedStyle(highlighted).fontWeight === '800' && getComputedStyle(highlighted).color === 'rgb(255, 209, 124)' &&
       getComputedStyle(highlighted).color !== getComputedStyle(plain).color;
   })()`));
-  await select('#theme', 'auto');
+  await restoreAutoTheme();
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] }); await delay(50);
   check('Candidate emphasis remains visible when Auto resolves to Light', await evaluate(`document.documentElement.dataset.theme === 'light' && document.querySelector('${cell(2)} .cell-candidates').children[3].classList.contains('is-matching')`));
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] }); await delay(50);
@@ -308,7 +320,7 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   assert.deepEqual(afterAuto.candidates[2], [1,2,4]);
   check('Auto Candidates replaces manual notes with direct legal digits', afterAuto.candidates[40].join() !== '7' && afterAuto.candidates[0].length === 0);
   await screenshot('auto-candidates.png');
-  await select('#theme', 'dark'); await screenshot('dark-candidates.png');
+  await setTheme('dark'); await screenshot('dark-candidates.png');
   await click('#undo'); assert.deepEqual(gameplay(await saved()), beforeAuto); check('One Undo restores every candidate before Auto Candidates', true);
   await click('#redo'); assert.deepEqual(gameplay(await saved()), afterAuto);
   await click('#notes'); await click(cell(2)); await key('4', 'Digit4');
@@ -386,7 +398,7 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
       check('Extreme shows a named generation animation and disables conflicting controls', await evaluate(`document.querySelector('#board').getAttribute('aria-busy') === 'true' && document.querySelector('#board').classList.contains('is-generating') && !document.querySelector('#generation-status').hidden && !document.querySelector('#generation-animation-name').hidden && document.querySelectorAll('.generation-overlay .generation-digit').length > 0 && ['new-game','restart','hint','solve','notes','auto-candidates','undo','redo','difficulty'].every(id => document.getElementById(id).disabled)`));
       await evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key:'1', bubbles:true }));`);
       assert.deepEqual(gameplay(await saved()), gameplay(old));
-      await select('#theme', 'light');
+      await setTheme('light');
       check('Appearance remains responsive during Extreme generation', await evaluate(`document.documentElement.dataset.theme === 'light'`));
       await screenshot('generating.png');
     }
