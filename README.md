@@ -1,8 +1,8 @@
 # Sudoku — Phase 3
 
-A desktop Sudoku application made with HTML, CSS, and vanilla JavaScript. Open `index.html` directly in Chrome or another modern desktop browser. Everything runs offline: no dependencies, installation, build step, server, external resources, or network requests. Classic scripts work from `file://`.
+A desktop Sudoku application made with HTML, CSS, and vanilla JavaScript. Open `index.html` directly in Chrome or another modern desktop browser. Everything runs offline: no dependencies, required installation, build step, server, external resources, or network requests. Classic scripts work from `file://`. The HTTPS-hosted version is also an installable standalone PWA; installation remains optional.
 
-When the game is hosted over HTTPS (or `localhost` during development), its service worker uses a network-first strategy: it fetches a fresh same-origin app shell on every visit and caches successful responses. After one successful online load, later visits fall back to that cached shell when offline, when the network takes longer than three seconds, or when the server has a temporary failure. The `file://` version remains directly playable without a service worker.
+When the game is hosted over HTTPS (or `localhost` during development), its manifest supplies stable `/sudoku/` identity and install icons. The service worker precaches the complete app shell atomically. Navigations use network-first with a 1.8-second timeout; static assets use stale-while-revalidate. After one successful online load, later visits fall back to the cached shell when offline, slow, or temporarily unavailable. A waiting update shows an **Update available** banner and reloads only after the player chooses **Reload**. The `file://` version remains directly playable without relying on manifest installation or a service worker.
 
 ## Playing
 
@@ -144,6 +144,8 @@ There is **no schema-version bump**. `puzzleDifficulty` is an optional backward-
 Validation retains all Phase 2 checks on current values, candidate lists, givens, completion status, settings, elapsed time, and both history stacks. Nested history is still rejected. It additionally verifies the saved puzzle's uniqueness and, when a rating is present, recomputes that rating. Valid Phase 2 saves migrate without losing values, notes, history, settings, or elapsed time. Malformed JSON, incompatible versions, invalid solutions, ambiguous puzzles, incorrect ratings, or corrupt snapshots cause safe fresh generation.
 
 Accepted central updates save automatically; timer-only writes are limited to once per elapsed second. `visibilitychange` and `pagehide` capture precise elapsed time. Active restoration adds the nonnegative difference from `savedAt`; completed games add no closed time. Restored arrays are copied and frozen.
+
+A manually completed puzzle also updates the optional `playground.result.sudoku.v1` summary with the completion count and fastest time by difficulty. Playground reads that separate record for its on-device results strip. Using **Solve** does not count as a completed result, and failure to write the summary never affects the authoritative `sudoku.game` save.
 
 Storage denial or quota errors leave gameplay usable and show the existing save-failure message. History is never silently truncated. There is one saved game per browser/location, with no synchronization across simultaneously open tabs. Direct-file persistence is verified in Chrome, including full browser closure/relaunch. Other browsers may restrict `file:` storage; private browsing, clearing browser data, or moving the application may prevent restoration.
 
