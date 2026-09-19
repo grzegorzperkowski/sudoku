@@ -35,6 +35,27 @@
   // current game playable and never substitutes an easier puzzle.
   const EXTREME_GENERATION_TIME_BUDGET_MS = 10_000;
   const MIN_GENERATION_DISPLAY_MS = 1_100;
+  const RESULT_STORAGE_KEY = "playground.result.sudoku.v1";
+
+  function saveCompletedResult(state) {
+    try {
+      const previous = JSON.parse(window.localStorage.getItem(RESULT_STORAGE_KEY));
+      const stats = previous?.version === 1 && previous.app === "sudoku" && previous.stats && typeof previous.stats === "object" ? previous.stats : {};
+      const completedCount = (Number.isSafeInteger(stats.completedCount) ? stats.completedCount : 0) + 1;
+      const fastestTimes = stats.fastestTimes && typeof stats.fastestTimes === "object" ? { ...stats.fastestTimes } : {};
+      fastestTimes[state.difficulty] = Math.min(Number(fastestTimes[state.difficulty]) || Infinity, state.elapsedTime);
+      const fastest = Object.entries(fastestTimes).sort((a, b) => a[1] - b[1])[0];
+      const formatTime = milliseconds => {
+        const seconds = Math.floor(milliseconds / 1000);
+        return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+      };
+      window.localStorage.setItem(RESULT_STORAGE_KEY, JSON.stringify({
+        version: 1, app: "sudoku", updatedAt: Date.now(),
+        summary: { primary: `${completedCount} completed`, secondary: fastest ? `${fastest[0]} best: ${formatTime(fastest[1])}` : "" },
+        stats: { completedCount, fastestTimes, last: { difficulty: state.difficulty, elapsedMs: state.elapsedTime, completedAt: Date.now() } }
+      }));
+    } catch { /* Results are optional when storage is unavailable. */ }
+  }
 
   // Scheduling and browser objects stay outside the serializable game state.
   function syncTimer(state) {
@@ -93,7 +114,10 @@
     view.render(state);
     syncTimer(state);
     if (action.type === "START_GAME" || action.type === "RESTART_GAME") view.playGameStartAnimation();
-    if (state.status === "completed" && previous.status !== "completed" && action.type !== "LOAD_SAVED_STATE") view.playCompletionAnimation();
+    if (state.status === "completed" && previous.status !== "completed" && action.type !== "LOAD_SAVED_STATE") {
+      view.playCompletionAnimation();
+      if (action.type !== "SOLVE") saveCompletedResult(state);
+    }
     // Save all meaningful transitions, with timer-only writes capped at once
     // per second. Capture precise milliseconds again at lifecycle boundaries.
     if (action.type !== "TICK" || Math.floor(state.elapsedTime / 1000) !== lastSavedSecond) saveGame();
@@ -233,17 +257,6 @@
   }
 
   bindEventListeners();
-
-  // A service worker gives hosted copies of the game an offline app shell
-  // after the first successful visit. file:// already loads these local files
-  // directly and cannot register a service worker, so it is left untouched.
-  if ((window.location.protocol === "http:" || window.location.protocol === "https:") &&
-      window.isSecureContext && "serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./service-worker.js").catch(() => {
-      // Offline caching is optional: gameplay must still work if a host
-      // forbids service workers or the browser has them disabled.
-    });
-  }
 
   actions.setSystemTheme(systemTheme.matches ? "dark" : "light");
   if (!restoredState) startNewGame();
