@@ -284,7 +284,7 @@
       refs.generationError.hidden = !failed;
       if (failed) announce(refs.generationError.textContent);
     }
-    return { render, focusCell, playGameStartAnimation, playCompletionAnimation, renderPersistence, renderFileStatus, renderGenerationError };
+    return { render, focusCell, playGameStartAnimation, playCompletionAnimation, renderPersistence, renderFileStatus, renderGenerationError, announce };
   }
 
   Sudoku.createGameView = createGameView;

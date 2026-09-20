@@ -73,6 +73,10 @@ async function click(selector) {
   await send('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 });
   await send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 });
 }
+const confirmOpen = () => evaluate(`Boolean(document.querySelector('#confirm-dialog')?.open)`);
+async function acceptConfirmIfShown() {
+  if (await confirmOpen()) await click('#confirm-accept');
+}
 async function key(key, code = key, modifiers = 0) {
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, modifiers, ...(/^[1-9]$/.test(key) ? { text: key } : {}) });
   await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, modifiers });
@@ -198,6 +202,7 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   await select('#difficulty', 'Extreme');
   await seedGeneration();
   await click('#new-game');
+  await acceptConfirmIfShown();
   await ready();
   check('New Game retains requested difficulty and generates a verified Extreme puzzle', await evaluate(`document.querySelector('#difficulty').value === 'Extreme' && document.querySelector('#puzzle-label').textContent === 'Extreme puzzle' && !document.querySelector('.is-selected') && Sudoku.analyzeDifficulty(JSON.parse(localStorage.getItem('sudoku.game')).state.givens).difficulty === 'Extreme'`));
   await legacyFixture({ difficulty: 'Extreme' });
@@ -354,6 +359,7 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   await click('#undo'); check('Undo completion reopens the board', await evaluate(`document.querySelector('#completion').hidden && document.querySelector('#game-status').textContent === 'In progress'`));
   await click('#redo'); check('Redo completion stops play again', await evaluate(`!document.querySelector('#completion').hidden && document.querySelector('[data-digit="1"]').disabled`));
   await click('#new-game');
+  await acceptConfirmIfShown();
   await ready();
   check('New Game clears persisted old puzzle history and candidates', (await saved()).history.length === 0 && (await saved()).future.length === 0 && (await saved()).candidates.every(digits=>digits.length===0));
   await legacyFixture({ difficulty: 'Hard', theme: 'dark' });
@@ -384,16 +390,19 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   await click('#redo'); check('Redo still works after full browser relaunch', !(await saved()).candidates[2].includes(4));
   // Phase 3: exercise real generation through the application's UI. A seeded
   // random source stabilizes timing; no generator result is stubbed or cached.
-  const beforeCancel = await saved(), dialogCount = dialogs.length;
-  nextDialogAnswer = false; await click('#new-game');
+  const beforeCancel = await saved();
+  await click('#new-game');
+  check('New Game asks in-app before abandoning an unfinished puzzle', await confirmOpen());
+  await click('#confirm-cancel');
   assert.deepEqual(gameplay(await saved()), gameplay(beforeCancel));
-  check('Cancelling New Game preserves an unfinished game and its history', dialogs.length === dialogCount + 1 && (await saved()).history.length === beforeCancel.history.length);
+  check('Cancelling New Game preserves an unfinished game and its history', !(await confirmOpen()) && (await saved()).history.length === beforeCancel.history.length);
   const generatedBoards = [];
   for (const difficulty of ['Easy','Normal','Hard','Expert','Extreme']) {
     await select('#difficulty', difficulty); await seedGeneration();
     const old = await saved();
     if (old.puzzleDifficulty) check('Selecting ' + difficulty + ' preserves the active puzzle rating', await evaluate(`document.querySelector('#puzzle-label').textContent`) === old.puzzleDifficulty + ' puzzle');
     await click('#new-game');
+    await acceptConfirmIfShown();
     if (difficulty === 'Extreme') {
       check('Extreme shows a named generation animation and disables conflicting controls', await evaluate(`document.querySelector('#board').getAttribute('aria-busy') === 'true' && document.querySelector('#board').classList.contains('is-generating') && !document.querySelector('#generation-status').hidden && !document.querySelector('#generation-animation-name').hidden && document.querySelectorAll('.generation-overlay .generation-digit').length > 0 && ['new-game','restart','hint','solve','notes','auto-candidates','undo','redo','difficulty'].every(id => document.getElementById(id).disabled)`));
       await evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key:'1', bubbles:true }));`);
@@ -439,10 +448,15 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
     await click('#redo'); assert.deepEqual(gameplay(await saved()), gameplay(afterHint));
     check('Refreshing a generated game preserves candidates and redoable Hint', (await saved()).puzzleDifficulty === 'Normal');
     await screenshot('generated-notes.png');
-    const beforeSolve = await saved(), beforeDialog = dialogs.length;
-    nextDialogAnswer = false; await click('#solve'); assert.deepEqual(gameplay(await saved()), gameplay(beforeSolve));
-    check('Solve cancellation preserves the entire generated board', dialogs.length === beforeDialog + 1);
-    await click('#solve'); const solved = await saved();
+    const beforeSolve = await saved();
+    await click('#solve');
+    check('Solve asks in-app before revealing the solution', await confirmOpen());
+    await click('#confirm-cancel');
+    assert.deepEqual(gameplay(await saved()), gameplay(beforeSolve));
+    check('Solve cancellation preserves the entire generated board', !(await confirmOpen()));
+    await click('#solve');
+    await acceptConfirmIfShown();
+    const solved = await saved();
     check('Confirmed Solve completes through state, clears notes and records one history action', solved.status === 'completed' && solved.values.join('') === solved.solution.join('') && solved.candidates.every(list => !list.length) && solved.history.length === beforeSolve.history.length + 1);
     await delay(1100); await reload();
     check('Solved generated board persists with a frozen timer and completion UI', (await saved()).elapsedTime === solved.elapsedTime && await evaluate(`!document.querySelector('#completion').hidden`));
@@ -473,7 +487,7 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   for (let i=0;i<100;i++) { if (await evaluate(`document.querySelector('#summary')?.textContent.includes('checks passed')`)) break; await delay(30); }
   check('Core regression page passes in the browser', await evaluate(`document.querySelector('#summary').className === 'passed' && document.querySelectorAll('#results li').length === SudokuTestResults.length && SudokuTestResults.length >= 67`));
   check('No application JavaScript errors', errors.length === 0);
-  check('No application network requests', network.every(url => url.startsWith('file:') || url.startsWith('data:')));
+  check('No application network requests', network.every(url => url.startsWith('file:') || url.startsWith('data:') || /^https:\/\/(gc\.zgo\.at|gperkowski\.goatcounter\.com)\//.test(url)));
   console.log(JSON.stringify({ passed: passed.length, checks: passed, layout, errors, requests: network }, null, 2));
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {
   clearTimeout(timeout);

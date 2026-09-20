@@ -170,6 +170,41 @@ kbd { font-family: inherit; font-size: 10px; min-width: 17px; padding: 3px 4px; 
 .completion-mark { font-size: 22px; color: var(--accent); }
 .completion h2 { font-family: Georgia, "Times New Roman", serif; font-size: 21px; font-weight: 400; margin: 0 0 5px; }
 .completion p { margin: 0; color: var(--text); font-size: 12px; }
+.confirm-dialog {
+  width: min(26rem, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 28px 26px 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  background: var(--surface-bg);
+  box-shadow: var(--shadow), 0 24px 64px rgb(35 49 37 / 16%);
+}
+.confirm-dialog::backdrop { background: rgb(37 46 42 / .5); }
+:root[data-theme="dark"] .confirm-dialog::backdrop { background: rgb(8 12 10 / .62); }
+.confirm-dialog[open] { animation: confirm-appear 180ms ease-out; }
+.confirm-dialog .eyebrow { margin: 0 0 10px; }
+.confirm-dialog h2 {
+  margin: 0 0 10px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 28px;
+  font-weight: 400;
+  letter-spacing: -0.8px;
+  line-height: 1.15;
+}
+.confirm-dialog p:not(.eyebrow) {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.confirm-actions .button { flex: 1 1 8rem; min-height: 44px; }
+.confirm-actions .button-primary { width: auto; justify-content: center; }
+@keyframes confirm-appear {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 @keyframes board-start {
   from { opacity: 0; transform: translateY(8px) scale(.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
@@ -260,7 +295,7 @@ kbd { font-family: inherit; font-size: 10px; min-width: 17px; padding: 3px 4px; 
   .cell.is-matching .cell-value { border-bottom: 2px solid currentColor; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .board.is-game-starting, .board.is-generating, .completion.is-celebrating, .completion.is-celebrating .completion-mark, #generation-status::before, .generation-overlay .generation-digit { animation: none; }
+  .board.is-game-starting, .board.is-generating, .completion.is-celebrating, .completion.is-celebrating .completion-mark, #generation-status::before, .generation-overlay .generation-digit, .confirm-dialog[open] { animation: none; }
   .generation-overlay { display: none; }
   .theme-sun, .theme-moon, .theme-track > span { transition: none; }
 }

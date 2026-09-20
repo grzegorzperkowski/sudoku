@@ -22,7 +22,13 @@
     importGame: document.querySelector("#import-game"),
     importFile: document.querySelector("#import-game-file"),
     difficulty: document.querySelector("#difficulty"),
-    themeToggle: document.querySelector("#theme-toggle")
+    themeToggle: document.querySelector("#theme-toggle"),
+    confirmDialog: document.querySelector("#confirm-dialog"),
+    confirmKicker: document.querySelector("#confirm-kicker"),
+    confirmTitle: document.querySelector("#confirm-title"),
+    confirmDescription: document.querySelector("#confirm-description"),
+    confirmCancel: document.querySelector("#confirm-cancel"),
+    confirmAccept: document.querySelector("#confirm-accept")
   });
   const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
   const KEYBOARD_DIRECTIONS = Object.freeze({
@@ -36,6 +42,30 @@
   const EXTREME_GENERATION_TIME_BUDGET_MS = 10_000;
   const MIN_GENERATION_DISPLAY_MS = 1_100;
   const RESULT_STORAGE_KEY = "playground.result.sudoku.v1";
+  const CONFIRM_COPY = Object.freeze({
+    newGame: {
+      kicker: "NEW PUZZLE",
+      title: "Abandon this unfinished puzzle?",
+      description: "Starting a new game will replace your current progress.",
+      acceptLabel: "New Game",
+      announce: "Abandon this unfinished puzzle and start a new game? Cancel to keep this puzzle, or New Game to start over."
+    },
+    import: {
+      kicker: "LOAD FILE",
+      title: "Load this saved game?",
+      description: "Your current game will be replaced.",
+      acceptLabel: "Load game",
+      announce: "Load this saved game? Your current game will be replaced. Cancel to keep this puzzle, or Load game to replace it."
+    },
+    solve: {
+      kicker: "ASSISTANCE",
+      title: "Reveal the complete solution?",
+      description: "This fills every empty cell and ends the puzzle.",
+      acceptLabel: "Reveal",
+      announce: "Reveal the complete solution? Cancel to keep solving, or Reveal to fill the board."
+    }
+  });
+  let pendingConfirmAction = null;
 
   function saveCompletedResult(state) {
     try {
@@ -59,9 +89,10 @@
 
   // Scheduling and browser objects stay outside the serializable game state.
   function syncTimer(state) {
-    if (state.status === "active" && timerId === null) {
+    const shouldRun = state.status === "active" && !elements.confirmDialog.open;
+    if (shouldRun && timerId === null) {
       timerId = window.setInterval(actions.tick, 250);
-    } else if (state.status !== "active" && timerId !== null) {
+    } else if (!shouldRun && timerId !== null) {
       window.clearInterval(timerId);
       timerId = null;
     }
@@ -101,10 +132,16 @@
     if (!file || store.getState().generating) return;
     try {
       const importedState = persistence.importGame(await file.text());
-      if (store.getState().status !== "idle" && !window.confirm("Load this saved game? Your current game will be replaced.")) return;
-      actions.loadState(importedState);
-      focusSelection();
-      view.renderFileStatus("Game loaded from file.");
+      const loadImported = () => {
+        actions.loadState(importedState);
+        focusSelection();
+        view.renderFileStatus("Game loaded from file.");
+      };
+      if (store.getState().status !== "idle") {
+        openConfirm("import", loadImported);
+        return;
+      }
+      loadImported();
     } catch {
       view.renderFileStatus("Could not load that file. Choose a valid Sudoku game file.", true);
     }
@@ -129,9 +166,17 @@
 
   async function startNewGame() {
     const state = store.getState();
+    if (state.generating || elements.confirmDialog.open) return;
+    if (state.status === "active" && gameHasProgress(state)) {
+      openConfirm("newGame", () => { void beginNewGame(); });
+      return;
+    }
+    await beginNewGame();
+  }
+
+  async function beginNewGame() {
+    const state = store.getState();
     if (state.generating) return;
-    const hasProgress = gameHasProgress(state);
-    if (state.status === "active" && hasProgress && !window.confirm("Abandon this unfinished puzzle and start a new game?")) return;
     actions.setGenerating(true);
     view.renderGenerationError(false);
     const minimumDisplay = new Promise(resolve => window.setTimeout(resolve, MIN_GENERATION_DISPLAY_MS));
@@ -146,6 +191,45 @@
       actions.setGenerating(false);
       view.renderGenerationError(true);
     }
+  }
+
+  function openConfirm(kind, onAccept, onCancel) {
+    const copy = CONFIRM_COPY[kind];
+    if (!copy || elements.confirmDialog.open) return;
+    actions.tick();
+    saveGame();
+    pendingConfirmAction = { onAccept, onCancel };
+    elements.confirmKicker.textContent = copy.kicker;
+    elements.confirmTitle.textContent = copy.title;
+    elements.confirmDescription.textContent = copy.description;
+    elements.confirmAccept.textContent = copy.acceptLabel;
+    elements.confirmDialog.dataset.kind = kind;
+    elements.confirmDialog.setAttribute("role", "alertdialog");
+    elements.confirmDialog.showModal();
+    elements.confirmCancel.focus();
+    syncTimer(store.getState());
+    view.announce(copy.announce);
+  }
+
+  function closeConfirm() {
+    pendingConfirmAction = null;
+    if (elements.confirmDialog.open) elements.confirmDialog.close();
+    elements.confirmDialog.removeAttribute("data-kind");
+    elements.confirmDialog.setAttribute("role", "dialog");
+    syncTimer(store.getState());
+  }
+
+  function cancelConfirm() {
+    const cancel = pendingConfirmAction?.onCancel;
+    closeConfirm();
+    if (cancel) cancel();
+    view.announce("Action cancelled.");
+  }
+
+  function acceptConfirm() {
+    const accept = pendingConfirmAction?.onAccept;
+    closeConfirm();
+    if (accept) accept();
   }
 
   function gameHasProgress(state) {
@@ -165,7 +249,7 @@
   }
 
   function handleKeyboardInput(event) {
-    if (store.getState().generating) return;
+    if (store.getState().generating || elements.confirmDialog.open) return;
     if (event.altKey || event.isComposing || event.defaultPrevented) return;
     // Let native form controls and focused toolbar buttons retain their keys.
     if (event.target.closest("input, select, textarea, [contenteditable]:not([contenteditable='false'])")) return;
@@ -214,7 +298,9 @@
   }
 
   function confirmSolve() {
-    if (store.getState().status === "active" && !store.getState().generating && window.confirm("Reveal the complete solution?")) actions.solve(true);
+    const state = store.getState();
+    if (state.status !== "active" || state.generating || elements.confirmDialog.open) return;
+    openConfirm("solve", () => actions.solve(true));
   }
 
   function dispatchAndFocus(action) {
@@ -244,6 +330,12 @@
     elements.importGame.addEventListener("click", openImportDialog);
     elements.importFile.addEventListener("change", importGame);
     elements.solve.addEventListener("click", confirmSolve);
+    elements.confirmCancel.addEventListener("click", cancelConfirm);
+    elements.confirmAccept.addEventListener("click", acceptConfirm);
+    elements.confirmDialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      cancelConfirm();
+    });
     elements.difficulty.addEventListener("change", (event) => actions.setDifficulty(event.target.value));
     elements.themeToggle.addEventListener("click", () => {
       const state = store.getState();

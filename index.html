@@ -139,6 +139,15 @@
     </main>
     <footer class="app-footer"><p>Every number has its place. · <a href="/mygame/">Playground</a></p></footer>
   </div>
+  <dialog id="confirm-dialog" class="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-description">
+    <p class="eyebrow" id="confirm-kicker">PLEASE CONFIRM</p>
+    <h2 id="confirm-title">Start a new game?</h2>
+    <p id="confirm-description">Your current progress will be lost.</p>
+    <div class="confirm-actions">
+      <button id="confirm-cancel" type="button" class="button">Cancel</button>
+      <button id="confirm-accept" type="button" class="button button-primary">New Game</button>
+    </div>
+  </dialog>
   <p id="live-announcements" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
   <noscript><p class="noscript">Please enable JavaScript to play this offline Sudoku game.</p></noscript>
   <script data-goatcounter="https://gperkowski.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
