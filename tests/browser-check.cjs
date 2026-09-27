@@ -152,9 +152,24 @@ const timeout = setTimeout(() => { console.error('Browser check timed out'); chr
   await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: initialSave.identifier });
   check('9 rows and 81 cells render from file URL', await evaluate(`document.querySelectorAll('[role="row"]').length === 9 && document.querySelectorAll('[role="gridcell"]').length === 81`));
   check('Restored game plays the board entrance animation', await evaluate(`document.querySelector('#board').classList.contains('is-game-starting')`));
-  check('30 givens and a square board', await evaluate(`document.querySelectorAll('.is-given').length === 30 && (() => {const r=document.querySelector('#board').getBoundingClientRect();return r.width===r.height;})()`));
+  check('30 givens and a square board', await evaluate(`document.querySelectorAll('.is-given').length === 30 && (() => {const board=document.querySelector('#board');return board.offsetWidth===board.offsetHeight;})()`));
   check('Thick box boundaries and thin internal boundaries', await evaluate(`getComputedStyle(document.querySelector('[data-cell="2"]')).borderRightWidth === '2px' && getComputedStyle(document.querySelector('[data-cell="1"]')).borderRightWidth === '1px' && getComputedStyle(document.querySelector('[data-cell="18"]')).borderBottomWidth === '2px' && getComputedStyle(document.querySelector('[data-cell="9"]')).borderBottomWidth === '1px'`));
   await screenshot('light.png');
+  for (const width of [320, 390, 768]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 844, deviceScaleFactor: 1, mobile: true });
+    check(`${width}px play controls follow the board without overflow`, await evaluate(`(() => {
+      const rect = selector => document.querySelector(selector).getBoundingClientRect();
+      const board = rect('#board'), progress = rect('.progress-block'), timer = rect('.timer-block');
+      const notes = rect('#notes'), keypad = rect('#keypad'), actions = rect('.entry-actions'), difficulty = rect('.difficulty-control');
+      return board.width <= innerWidth - 32 && document.documentElement.scrollWidth <= innerWidth &&
+        progress.right < timer.left && progress.bottom < board.top && timer.bottom < board.top &&
+        board.bottom < notes.top && notes.bottom < keypad.top && keypad.bottom < actions.top && actions.bottom < difficulty.top &&
+        Math.abs(notes.width - board.width) <= 1 && notes.height >= 36 && notes.height <= 38 &&
+        [...document.querySelectorAll('#keypad button, .entry-actions button')].every(button => button.getBoundingClientRect().height >= 41);
+    })()`));
+    if (width === 390) await screenshot('mobile-layout.png');
+  }
+  await send('Emulation.setDeviceMetricsOverride', { width: 1360, height: 1100, deviceScaleFactor: 1, mobile: false });
   await click(cell(0));
   check('Mouse selection and grid focus', (await selected()) === 0 && await evaluate(`document.activeElement.dataset.cell === '0'`));
   check('Keypad highlights the selected given digit', await evaluate(`document.querySelector('[data-digit="5"]').classList.contains('is-selected-digit') && !document.querySelector('[data-digit="4"]').classList.contains('is-selected-digit')`));

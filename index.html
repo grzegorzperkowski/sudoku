@@ -54,21 +54,20 @@
               <p id="puzzle-label" class="puzzle-label">Sudoku</p>
               <p id="game-status" class="game-status">Generating puzzle...</p>
             </div>
-            <div class="timer-block">
-              <span class="timer-label">TIME</span>
-              <time id="timer">00:00:00</time>
+            <div class="board-metrics">
+              <div class="progress-block">
+                <output id="filled-count">30 <span>/ 81 filled</span></output>
+                <progress id="progress" class="progress-track" aria-label="Cells filled" max="81" value="30"></progress>
+              </div>
+              <div class="timer-block">
+                <span class="timer-label">TIME</span>
+                <time id="timer">00:00:00</time>
+              </div>
             </div>
           </header>
           <div id="board" class="board" role="grid" aria-label="Sudoku puzzle" aria-rowcount="9" aria-colcount="9" aria-describedby="keyboard-help"></div>
           <footer class="board-footer">
-            <div class="history-controls" role="group" aria-label="History controls">
-              <button id="undo" type="button" class="button button-quiet" disabled title="Undo (Ctrl+Z)"><span aria-hidden="true">↶</span> Undo</button>
-              <button id="redo" type="button" class="button button-quiet" disabled title="Redo (Ctrl+Y or Ctrl+Shift+Z)"><span aria-hidden="true">↷</span> Redo</button>
-            </div>
-            <div class="progress-block">
-              <output id="filled-count">30 <span>/ 81 filled</span></output>
-              <progress id="progress" class="progress-track" aria-label="Cells filled" max="81" value="30"></progress>
-            </div>
+            <button id="notes" type="button" class="button notes-button" aria-pressed="false" title="Toggle candidate Notes mode">Notes</button>
           </footer>
           <section id="completion" class="completion" hidden>
             <span class="completion-mark" aria-hidden="true">✓</span>
@@ -100,14 +99,17 @@
                 <button type="button" data-digit="4" aria-label="Enter 4">4</button><button type="button" data-digit="5" aria-label="Enter 5">5</button><button type="button" data-digit="6" aria-label="Enter 6">6</button>
                 <button type="button" data-digit="7" aria-label="Enter 7">7</button><button type="button" data-digit="8" aria-label="Enter 8">8</button><button type="button" data-digit="9" aria-label="Enter 9">9</button>
               </div>
-              <button id="erase" type="button" class="button erase-button"><span aria-hidden="true">⌫</span> Erase</button>
+              <div class="entry-actions" role="group" aria-label="Entry and history controls">
+                <button id="erase" type="button" class="button erase-button"><span aria-hidden="true">⌫</span> Erase</button>
+                <button id="undo" type="button" class="button" disabled title="Undo (Ctrl+Z)"><span aria-hidden="true">↶</span> Undo</button>
+                <button id="redo" type="button" class="button" disabled title="Redo (Ctrl+Y or Ctrl+Shift+Z)"><span aria-hidden="true">↷</span> Redo</button>
+              </div>
               <p id="selection-help" class="selection-help" aria-live="polite">Choose any empty cell to begin.</p>
             </section>
             <div class="panel-divider" aria-hidden="true"></div>
             <section aria-labelledby="assistance-heading">
               <header class="tools-heading"><h2 id="assistance-heading">Assistance</h2></header>
               <div class="future-controls">
-                <button id="notes" type="button" class="button" aria-pressed="false" title="Toggle candidate Notes mode">Notes</button>
                 <button id="auto-candidates" type="button" class="button" title="Replace notes with all directly legal candidates">Auto Candidates</button>
                 <button id="hint" type="button" class="button" disabled title="Reveal one correct digit">Hint</button>
                 <button id="solve" type="button" class="button" disabled title="Reveal the solution after confirmation">Solve</button>
