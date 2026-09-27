@@ -57,6 +57,7 @@
         candidates.hidden = true;
         const candidateSlots = Array.from({ length: BOARD_SIZE }, () => {
           const slot = root.createElement("span");
+          slot.append(root.createElement("span"));
           candidates.append(slot);
           return slot;
         });
@@ -164,7 +165,12 @@
       candidates.hidden = digit !== 0 || given || notes.length === 0;
       candidateSlots.forEach((slot, position) => {
         const candidate = position + 1;
-        slot.textContent = notes.includes(candidate) ? candidate : "";
+        const nextText = notes.includes(candidate) ? String(candidate) : "";
+        const glyph = slot.firstElementChild;
+        if (glyph.textContent !== nextText) {
+          glyph.textContent = nextText;
+          slot.classList.toggle("is-entering", Boolean(nextText));
+        }
         slot.classList.toggle("is-matching", selectedDigit !== 0 && candidate === selectedDigit && notes.includes(candidate));
       });
       button.tabIndex = index === (selected === null ? 0 : selected) ? 0 : -1;
