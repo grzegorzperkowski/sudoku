@@ -25,10 +25,10 @@
       timer: find("#timer"), status: find("#game-status"),
       themeToggle: find("#theme-toggle"), difficulty: find("#difficulty"),
       selection: find("#selection-label"), selectionHelp: find("#selection-help"),
-      erase: find("#erase"), digits: [...root.querySelectorAll("[data-digit]")],
+      digits: [...root.querySelectorAll("[data-digit]")],
       filled: find("#filled-count"), progress: find("#progress"),
       completion: find("#completion"), completionMessage: find("#completion-message"),
-      undo: find("#undo"), redo: find("#redo"), notes: find("#notes"), autoCandidates: find("#auto-candidates"),
+      notes: [find("#notes"), find("#notes-desktop")], autoCandidates: find("#auto-candidates"),
       inputHeading: find("#input-heading"), keypad: find("#keypad"), persistence: find("#persistence-status"),
       hint: find("#hint"), solve: find("#solve"), newGame: find("#new-game"), restart: find("#restart"),
       puzzleLabel: find("#puzzle-label"), generation: find("#generation-status"), generationAnimationName: find("#generation-animation-name"), generationError: find("#generation-error"),
@@ -225,11 +225,10 @@
         button.classList.toggle("is-selected-digit", isSelectedDigit);
         button.setAttribute("aria-label", `${state.notesMode ? "Toggle candidate" : "Enter"} ${digit}`);
       });
-      refs.erase.disabled = !editable || (state.values[selected] === 0 && state.candidates[selected].length === 0);
-      refs.undo.disabled = busy || state.history.length === 0;
-      refs.redo.disabled = busy || state.future.length === 0;
-      refs.notes.disabled = busy || state.status !== "active";
-      refs.notes.setAttribute("aria-pressed", String(state.notesMode));
+      refs.notes.forEach(button => {
+        button.disabled = busy || state.status !== "active";
+        button.setAttribute("aria-pressed", String(state.notesMode));
+      });
       refs.autoCandidates.disabled = busy || state.status !== "active";
       refs.hint.disabled = busy || state.status !== "active";
       refs.solve.disabled = busy || state.status !== "active";

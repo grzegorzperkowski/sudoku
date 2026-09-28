@@ -6,7 +6,7 @@ When the game is hosted over HTTPS (or `localhost` during development), its mani
 
 ## Playing
 
-Click a cell, move with the arrow keys, and enter digits using the keyboard or keypad. Delete, Backspace, and Erase clear editable cells. Givens are protected. Incorrect entries are checked against the verified solution; correct completion stops the timer and shows the existing completion message.
+Click a cell, move with the arrow keys, and enter digits using the keyboard or keypad. Delete and Backspace clear editable cells. Givens are protected. Incorrect entries are checked against the verified solution; correct completion stops the timer and shows the existing completion message.
 
 Use **Save to file** to download a shareable JSON snapshot of the current game, including entries, notes, settings, elapsed time, and Undo/Redo history. **Load from file** validates a snapshot before replacing the current game; invalid files leave the open game untouched. Imported games resume from the exported elapsed time, rather than adding time spent in transit.
 
@@ -16,17 +16,17 @@ Generation displays **Generating puzzle...** and its board animation for at leas
 
 ### Notes and history
 
-**Notes** toggles manual candidates in empty editable cells, shown in fixed positions in a 3×3 mini-grid. Normal number entry clears the cell's notes and removes that digit from row, column, and box peers. Deleting a value never adds candidates back. Erase also clears all notes in an empty cell.
+**Notes** toggles manual candidates in empty editable cells, shown in fixed positions in a 3×3 mini-grid. The button sits below the board on mobile and beneath the keypad on larger screens. Normal number entry clears the cell's notes and removes that digit from row, column, and box peers. Deleting a value or notes never adds candidates back.
 
 **Auto Candidates** replaces each empty cell's notes with all directly legal digits against the current board, including incorrect player entries. It does not consult the solution or run logical techniques. Manual notes may contain any digit.
 
-**Undo / Redo** restore exact values, notes, and completion status. Each entry and all its peer removals, each Hint, each confirmed Solve, and each Auto Candidates operation are one atomic history step. New gameplay after Undo clears Redo; no-ops do not. Use the buttons, `Ctrl+Z`, `Ctrl+Y`, or `Ctrl+Shift+Z` (Command equivalents work). Native form controls retain their shortcuts. Settings, selection, and elapsed time stay outside gameplay history, as in Phase 2.
+The store retains Undo / Redo history in saved games for compatibility, but the game does not expose history controls or shortcuts. Settings, selection, and elapsed time stay outside gameplay history, as in Phase 2.
 
 **Hint** fills exactly one correct digit without a textual technique explanation. It ignores manual notes and incorrect entries while finding the next logical placement; internal eliminations are not copied to player notes. If that position is logically stuck, Hint reveals one digit from the already verified solution. This assistance fallback is separate from puzzle rating: generated puzzles are never accepted using search to finish the logical solve. A Hint may correct one wrong cell. It keeps selection and Notes mode unchanged and uses the same value-entry/candidate-removal action path as ordinary input. Undo restores every affected note; Redo reproduces the Hint.
 
 **Solve** always asks for confirmation before revealing the verified solution. Confirmation creates one central state action, fills the board, clears all candidate notes, marks completion, and stops the timer. Cancellation changes nothing. Solve supports exact Undo/Redo, including resuming/stopping the timer when completion changes.
 
-Active time includes background-tab and closed time. Completed time stays frozen. Undo does not rewind the clock. Restart and New Game reset notes, both history stacks, selection, and time; theme, Notes mode, and the requested difficulty remain settings. Auto, Light, and Dark themes retain Phase 2 behavior.
+Active time counts only while the page is visible. Background-tab and closed time are excluded. Completed time stays frozen. Undo does not rewind the clock. Restart and New Game reset notes, both history stacks, selection, and time; theme, Notes mode, and the requested difficulty remain settings. Auto, Light, and Dark themes retain Phase 2 behavior.
 
 ## Architecture
 

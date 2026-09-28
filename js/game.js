@@ -288,6 +288,8 @@
     const clock = now || (() => global.performance ? global.performance.now() : Date.now());
     let state = initialState ? validateSavedState(initialState) : createInitialState();
     let startedAt = null;
+    let timerRunning = true;
+    let pausedElapsed = state.elapsedTime;
     const listeners = new Set();
 
     function readClock() {
@@ -298,8 +300,19 @@
 
     function currentElapsedTime() {
       if (state.status !== "active" || startedAt === null) return state.elapsedTime;
-      // Wall-clock differences remain accurate even if a background tab delays ticks.
+      if (!timerRunning) return pausedElapsed;
       return Math.max(state.elapsedTime, Math.floor(readClock() - startedAt), 0);
+    }
+
+    function setTimerRunning(running) {
+      if (timerRunning === running) return;
+      if (running) {
+        timerRunning = true;
+        startedAt = state.status === "active" ? readClock() - pausedElapsed : null;
+      } else {
+        pausedElapsed = currentElapsedTime();
+        timerRunning = false;
+      }
     }
 
     function dispatch(action) {
@@ -324,6 +337,7 @@
       }
 
       state = deepFreeze(nextState);
+      if (!timerRunning) pausedElapsed = nextState.elapsedTime;
       // Runtime listeners and clock anchors never enter the serializable state.
       Array.from(listeners).forEach(listener => listener(nextState, previousState, action));
       return nextState;
@@ -334,6 +348,7 @@
     return Object.freeze({
       getState: () => state,
       captureState: () => deepFreeze({ ...state, elapsedTime: currentElapsedTime() }),
+      setTimerRunning,
       subscribe(listener) {
         if (typeof listener !== "function") throw new TypeError("A state subscriber must be a function.");
         listeners.add(listener);

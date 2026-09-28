@@ -9,10 +9,7 @@
   const elements = Object.freeze({
     board: document.querySelector("#board"),
     keypad: document.querySelector("#keypad"),
-    erase: document.querySelector("#erase"),
-    undo: document.querySelector("#undo"),
-    redo: document.querySelector("#redo"),
-    notes: document.querySelector("#notes"),
+    notes: [document.querySelector("#notes"), document.querySelector("#notes-desktop")],
     autoCandidates: document.querySelector("#auto-candidates"),
     hint: document.querySelector("#hint"),
     solve: document.querySelector("#solve"),
@@ -89,7 +86,8 @@
 
   // Scheduling and browser objects stay outside the serializable game state.
   function syncTimer(state) {
-    const shouldRun = state.status === "active" && !elements.confirmDialog.open;
+    const shouldRun = state.status === "active" && !document.hidden && !elements.confirmDialog.open;
+    store.setTimerRunning(shouldRun);
     if (shouldRun && timerId === null) {
       timerId = window.setInterval(actions.tick, 250);
     } else if (!shouldRun && timerId !== null) {
@@ -253,19 +251,7 @@
     if (event.altKey || event.isComposing || event.defaultPrevented) return;
     // Let native form controls and focused toolbar buttons retain their keys.
     if (event.target.closest("input, select, textarea, [contenteditable]:not([contenteditable='false'])")) return;
-    if (event.ctrlKey || event.metaKey) {
-      const key = event.key.toLowerCase();
-      const undo = key === "z" && !event.shiftKey;
-      const redo = (key === "y" && !event.shiftKey) || (key === "z" && event.shiftKey);
-      const state = store.getState();
-      if ((undo && state.history.length) || (redo && state.future.length)) {
-        event.preventDefault();
-        if (undo) actions.undo();
-        else actions.redo();
-        focusSelection();
-      }
-      return;
-    }
+    if (event.ctrlKey || event.metaKey) return;
     if (event.target.closest("button, a") && !elements.board.contains(event.target)) return;
     if (KEYBOARD_DIRECTIONS[event.key]) {
       event.preventDefault();
@@ -284,11 +270,6 @@
     const button = event.target.closest("[data-digit]");
     if (!button || button.disabled) return;
     actions.inputDigit(Number(button.dataset.digit));
-    focusSelection();
-  }
-
-  function eraseSelectedCell() {
-    actions.clearCell();
     focusSelection();
   }
 
@@ -311,7 +292,14 @@
   }
 
   function saveOnVisibilityChange() {
-    actions.tick();
+    syncTimer(store.getState());
+    saveGame();
+  }
+
+  function saveOnPageHide() {
+    store.setTimerRunning(false);
+    if (timerId !== null) window.clearInterval(timerId);
+    timerId = null;
     saveGame();
   }
 
@@ -320,9 +308,8 @@
     elements.board.addEventListener("focusin", handleBoardFocus);
     document.addEventListener("keydown", handleKeyboardInput);
     elements.keypad.addEventListener("click", handleKeypadClick);
-    elements.erase.addEventListener("click", eraseSelectedCell);
     elements.restart.addEventListener("click", actions.restartGame);
-    [[elements.undo, actions.undo], [elements.redo, actions.redo], [elements.notes, actions.toggleNotesMode],
+    [...elements.notes.map(button => [button, actions.toggleNotesMode]),
       [elements.autoCandidates, actions.autoCandidates], [elements.hint, actions.hint]]
       .forEach(([element, action]) => element.addEventListener("click", dispatchAndFocus(action)));
     elements.newGame.addEventListener("click", startNewGame);
@@ -344,8 +331,8 @@
     });
     systemTheme.addEventListener("change", (event) => actions.setSystemTheme(event.matches ? "dark" : "light"));
     document.addEventListener("visibilitychange", saveOnVisibilityChange);
-    window.addEventListener("pagehide", saveGame);
-    window.addEventListener("pageshow", actions.tick);
+    window.addEventListener("pagehide", saveOnPageHide);
+    window.addEventListener("pageshow", () => syncTimer(store.getState()));
   }
 
   bindEventListeners();

@@ -226,6 +226,28 @@
     equal(Sudoku.formatElapsedTime(3661000), "01:01:01");
   });
 
+  test("The timer excludes time while the page is hidden and resumes from the saved elapsed time", () => {
+    const { store, advance, emptyCell } = newGame();
+    advance(1250);
+    store.setTimerRunning(false);
+    equal(store.captureState().elapsedTime, 1250, "Pausing captures time since the last tick");
+    advance(60000);
+    store.actions.selectCell(emptyCell);
+    store.actions.tick();
+    equal(store.getState().elapsedTime, 1250, "Actions while hidden cannot add time");
+    store.setTimerRunning(true);
+    advance(750);
+    store.actions.tick();
+    equal(store.getState().elapsedTime, 2000);
+    store.setTimerRunning(false);
+    advance(10000);
+    equal(store.captureState().elapsedTime, 2000);
+    store.setTimerRunning(true);
+    advance(500);
+    store.actions.tick();
+    equal(store.getState().elapsedTime, 2500);
+  });
+
   test("A full board with an incorrect value stays active; correcting the last error completes it", () => {
     const { store, puzzle, emptyCell, advance } = newGame();
     const wrong = (puzzle.solution[emptyCell] % 9) + 1;

@@ -24,10 +24,8 @@
             !Number.isSafeInteger(envelope.savedAt) || envelope.savedAt < 0 ||
             !Number.isSafeInteger(timestamp) || timestamp < 0) return null;
         const state = Sudoku.validateSavedState(envelope.state);
-        // An active game continues counting while closed, just as it does in a
-        // background tab. Completed games retain their frozen final duration.
-        const elapsedTime = state.elapsedTime + (state.status === "active" ? Math.max(0, timestamp - envelope.savedAt) : 0);
-        return Sudoku.validateSavedState({ ...state, elapsedTime });
+        // Time away from the page does not count toward the solving time.
+        return state;
       } catch (error) {
         // Missing permissions, malformed JSON, and corrupt nested history all
         // take the same safe path: let the app generate a clean game.

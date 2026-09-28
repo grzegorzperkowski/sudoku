@@ -243,14 +243,14 @@
     assert(restored.getState().candidates[2].includes(9));
   });
 
-  test("Persistence captures sub-tick time, counts closed active time, and resumes from a fresh clock origin", () => {
+  test("Persistence captures sub-tick time, excludes closed time, and resumes from a fresh clock origin", () => {
     const { store, advance } = newGame(); const harness = storageHarness();
     advance(12345); harness.persistence.save(store.captureState());
     harness.advance(6500);
     let clock = 10;
     const restored = Sudoku.createGameStore({ initialState: harness.persistence.load(), now: () => clock });
-    equal(restored.getState().elapsedTime, 18845);
-    clock += 1111; restored.actions.tick(); equal(restored.getState().elapsedTime, 19956);
+    equal(restored.getState().elapsedTime, 12345);
+    clock += 1111; restored.actions.tick(); equal(restored.getState().elapsedTime, 13456);
     const before = restored.getState(); restored.captureState(); equal(restored.getState(), before);
   });
 

@@ -125,8 +125,8 @@ h1 { font-family: Georgia, "Times New Roman", serif; font-size: 38px; font-weigh
 .cell-candidates > span.is-entering > span { animation: candidate-enter 260ms cubic-bezier(.2, .8, .25, 1); }
 .cell-candidates > span.is-matching { color: var(--candidate-match); background: var(--candidate-match-bg); border-radius: 4px; font-weight: 800; }
 .cell-candidates > span.is-matching > span { transform: scale(1.08); }
-#notes[aria-pressed="true"] { background: var(--selected-cell); border-color: var(--accent); color: var(--player); }
-.board-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+#notes[aria-pressed="true"], #notes-desktop[aria-pressed="true"] { background: var(--selected-cell); border-color: var(--accent); color: var(--player); }
+.board-footer { display: none; align-items: center; justify-content: space-between; margin-top: 14px; }
 .notes-button { min-width: 120px; }
 .button { display: inline-flex; justify-content: center; align-items: center; gap: 8px; min-height: 41px; padding: 9px 14px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-bg); color: var(--text); font-size: 12px; font-weight: 600; }
 .button:hover:enabled { background: var(--surface-soft); }
@@ -155,9 +155,8 @@ kbd { font-family: inherit; font-size: 10px; min-width: 17px; padding: 3px 4px; 
 .keypad button:active:enabled { background: var(--selected-cell); }
 .keypad button:disabled { color: var(--disabled-text); background: var(--disabled-bg); }
 .keypad button.is-selected-digit { background: var(--selected-cell); border-color: var(--accent); color: var(--player); box-shadow: inset 0 0 0 1px var(--accent); }
-.entry-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.entry-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 10px; }
 .entry-actions .button { min-width: 0; padding: 8px 4px; gap: 4px; }
-.entry-actions .button span { font-size: 19px; font-weight: 400; }
 .selection-help { min-height: 15px; margin: 9px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.5; }
 .future-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .future-controls .button { font-size: 11px; padding: 8px 4px; }
@@ -324,8 +323,9 @@ kbd { font-family: inherit; font-size: 10px; min-width: 17px; padding: 3px 4px; 
   .game-controls > .panel-divider { display: none; }
   .board-section { order: 0; width: var(--board-size); max-width: 100%; margin: 0 auto; }
   .board { width: 100%; height: auto; aspect-ratio: 1; }
-  .board-footer { margin-top: 6px; }
+  .board-footer { display: flex; margin-top: 6px; }
   .notes-button { width: 100%; min-height: 36px; padding: 6px 14px; }
+  .entry-actions { display: none; }
   .control-panel { display: block; order: 1; width: var(--board-size); max-width: 100%; margin: 0 auto; padding: 14px 16px; background: var(--surface-bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
   .keypad { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .keypad button { height: 48px; }
